@@ -94,6 +94,25 @@ async function tryRpcSet(fn, args, asUid) {
   } catch (e) { return { ok: false, err: e.message, code: e.code }; }
 }
 
+// ─── preflight：清扫历史孤儿 ────────────────────────────
+// chat_turns 的 user_id 刻意没有外键（成本事实表要能独立于账号留存），
+// 代价是删用户不会带走它。历史运行留下的无主行会让"成功轮次"之类的
+// 统计断言失真（已实际误报一次）。所以清扫必须在**造数据之前**做，
+// 只在末尾做的话，"发现污染的那一次"仍然会红，得跑第二次才绿。
+{
+  const swept = await admin.query(
+    'delete from public.chat_turns t where not exists ' +
+    '(select 1 from public.profiles p where p.id = t.user_id)');
+  if (swept.rowCount > 0) {
+    console.log(`\n[preflight] 清扫无主成本行 ${swept.rowCount} 条`);
+  }
+  const orphanUsers = await admin.query(
+    "select count(*)::int n from auth.users where email like 'rpc-%'");
+  if (Number(orphanUsers.rows[0].n) > 0) {
+    console.log(`[preflight] 发现历史遗留测试用户 ${orphanUsers.rows[0].n} 个（将在末尾一并清理）`);
+  }
+}
+
 // ─── 造数据 ────────────────────────────────────────────
 const stamp = Date.now();
 async function mkUser(tag, birth) {
@@ -439,6 +458,92 @@ const otherReports = await withRole(U, (c) =>
   c.query('select count(*)::int n from public.reports where reporter_id <> $1', [U]));
 t('看不到别人的举报', Number(otherReports.rows[0].n) === 0, String(otherReports.rows[0].n));
 
+// ─── 成本可观测（011）───────────────────────────────────
+console.log('\n[成本可观测]');
+await admin.query("update public.entitlements set tier='ultra' where user_id=$1", [U]);
+// 造 30 轮：20 轮命中 90%（健康）、10 轮无缓存（用来验算命中率与成本）
+const mkTurn = (cached, prompt, cost, credit, ok = true) =>
+  admin.query(
+    'insert into public.chat_turns (user_id,character_id,session_id,model,' +
+    'prompt_tokens,cached_tokens,completion_tokens,cost_cny,credit_charged,carried_tokens,ok) ' +
+    "values ($1,$2,$3,'deepseek-chat',$4,$5,600,$6,$7,8192,$8)",
+    [U, OFFICIAL, SID, prompt, cached, cost, credit, ok]);
+
+for (let i = 0; i < 20; i++) await mkTurn(9000, 10000, 0.0035, 0.021, true);
+for (let i = 0; i < 10; i++) await mkTurn(0, 10000, 0.0112, 0.021, true);
+// 失败轮不应计入统计
+for (let i = 0; i < 3; i++) await mkTurn(0, 10000, 0.005, 0, false);
+
+const hr = await tryRpcSet('cache_hit_rate', [null, null], 'service');
+t('cache_hit_rate 可调', hr.ok, hr.err);
+const hrRows = Array.isArray(hr.v) ? hr.v : [];
+const hrTotal = hrRows.reduce((a, r) => ({
+  turns: a.turns + Number(r.turns), prompt: a.prompt + Number(r.prompt_tokens),
+  cached: a.cached + Number(r.cached_tokens),
+}), { turns: 0, prompt: 0, cached: 0 });
+t('只统计成功的轮次（失败轮被排除）', hrTotal.turns === 30, String(hrTotal.turns));
+t('命中率按 (cached/prompt) 计算而非拍脑袋',
+  Math.abs(hrTotal.cached / hrTotal.prompt - 0.6) < 0.001,
+  (hrTotal.cached / hrTotal.prompt).toFixed(4) + ' 期望 0.6000');
+
+const hc = await tryRpcSet('cache_hit_by_character', [null], 'service');
+t('cache_hit_by_character 可调并带角色名',
+  hc.ok && Array.isArray(hc.v) && hc.v.length >= 1 && /官方·测试/.test(j(hc.v)),
+  hc.ok ? j(hc.v).slice(0, 100) : hc.err);
+
+const tm = await tryRpcSet('tier_margin', [30], 'service');
+t('tier_margin 可调', tm.ok, tm.err);
+const ultra = (Array.isArray(tm.v) ? tm.v : []).find((r) => r.tier === 'ultra');
+t('毛利倍率算得出且分级正确',
+  ultra && Number(ultra.retail_multiple) > 0,
+  ultra ? `multiple=${ultra.retail_multiple} alert=${ultra.alert}` : '未找到 ultra 档');
+// 合成数据：30 轮 credit 0.021 合计 0.63，cost 20×0.0035+10×0.0112=0.182 ⇒ 倍数约 3.46 ⇒ critical
+t('低于 3.5× 被标为 critical（告警真的会触发）',
+  ultra && ultra.alert === 'critical',
+  ultra ? String(ultra.alert) : 'n/a');
+
+const health = await tryRpc('check_prefix_health', [60, 0.90], 'service');
+t('check_prefix_health 可调', health.ok, health.err);
+t('命中率 60% 低于 90% ⇒ 判定不健康', health.ok && health.v.ok === false,
+  j(health.v ?? health.err));
+t('告警写进了 admin_audit', await (async () => {
+  const a = await admin.query(
+    "select count(*)::int n from public.admin_audit where action='prefix_health_alarm'");
+  return Number(a.rows[0].n) >= 1;
+})(), '未找到告警记录');
+t('能定位到具体可疑角色', health.ok && /官方·测试/.test(j(health.v.suspect_characters)),
+  j(health.ok ? health.v.suspect_characters : health.err));
+
+// 低样本时必须跳过而不是误报。
+// ⚠ 前提要造对：刚插入的行就在当前时间，任何 ≥1 分钟的窗口都会包含它们，
+//   所以先把这批轮次挪到 3 小时前，让"最近 60 分钟"真的为空。
+await admin.query(
+  "update public.chat_turns set created_at = now() - interval '3 hours' where user_id=$1", [U]);
+const lowSample = await tryRpc('check_prefix_health', [60, 0.99], 'service');
+t('样本不足时跳过判定（不误报）',
+  lowSample.ok && lowSample.v.skipped === true && lowSample.v.reason === 'LOW_SAMPLE',
+  j(lowSample.v ?? lowSample.err));
+t('低样本时 turns 确实为 0（证明真的走到了跳过分支）',
+  lowSample.ok && Number(lowSample.v.turns) === 0, j(lowSample.v ?? lowSample.err));
+
+const mt = await tryRpcSet('my_turns', [10], U);
+t('my_turns 可调且只回自己那几行', mt.ok && Array.isArray(mt.v) && mt.v.length === 10,
+  mt.ok ? String(mt.v.length) : mt.err);
+t('my_turns 不暴露成本价（只有扣费额）',
+  mt.ok && mt.v.length > 0 && !('cost_cny' in mt.v[0]) && 'credit' in mt.v[0],
+  mt.ok && mt.v[0] ? Object.keys(mt.v[0]).join(',') : 'n/a');
+
+const mtOther = await tryRpcSet('my_turns', [10], V);
+t('别人看不到我的轮次明细',
+  !mtOther.ok || (Array.isArray(mtOther.v) && mtOther.v.length === 0),
+  mtOther.ok ? String(mtOther.v.length) + ' 行' : mtOther.err);
+
+const costView = await admin.query('select count(*)::int n from public.admin_cost_daily');
+t('admin_cost_daily 视图可用', Number(costView.rows[0].n) >= 1, String(costView.rows[0].n));
+const costViewLocked = await withRole(U, (c) =>
+  c.query('select count(*)::int n from public.admin_cost_daily')).then(() => false).catch(() => true);
+t('成本视图对普通用户不可读', costViewLocked === true);
+
 // ─── 清理 ──────────────────────────────────────────────
 if (!KEEP) {
   console.log('\n[清理]');
@@ -452,6 +557,14 @@ if (!KEEP) {
   await withRole('service', async (c) => {
     await c.query('delete from public.ledger where user_id = any($1::uuid[])', [ids]);
     await c.query('delete from public.balances where user_id = any($1::uuid[])', [ids]);
+    // chat_turns.user_id 刻意没有外键（成本事实表需独立于账号留存），
+    // 所以删用户不会带走它。先按本次 ids 清，再扫一遍孤儿 ——
+    // 早期运行的产物其 user_id 已不在 profiles 里，按 ids 删不掉，
+    // 而这些不可归因的行会污染后续统计断言（已实际误报过一次）。
+    await c.query('delete from public.chat_turns where user_id = any($1::uuid[])', [ids]);
+    await c.query(
+      'delete from public.chat_turns t where not exists ' +
+      '(select 1 from public.profiles p where p.id = t.user_id)');
   });
   const r = await admin.query('delete from auth.users where id = any($1::uuid[])', [ids]);
   t('清理本脚本创建的全部测试用户（含历史遗留）', r.rowCount === ids.length,

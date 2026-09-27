@@ -46,7 +46,7 @@ class SyncCoordinator @Inject constructor(
      */
     suspend fun onPushed(event: RealtimeEvent.NewMessage) = withContext(Dispatchers.IO) {
         // 已通知过的高水位：重启后不把老消息再弹一遍。
-        val lastNotified = runCatching { firstValue(settings.lastNotifiedMessageId) }.getOrNull()
+        val lastNotified = runCatching { settings.lastNotifiedMessageId.first() }.getOrNull()
         if (lastNotified == event.messageId) return@withContext
 
         val row = runCatching {
@@ -124,11 +124,4 @@ class SyncCoordinator @Inject constructor(
 
     private fun JsonObject.strOf(key: String): String =
         get(key)?.toString()?.trim('"')?.takeIf { it != "null" } ?: ""
-
-    private suspend fun <T> firstValue(flow: kotlinx.coroutines.flow.Flow<T>): T =
-        kotlinx.coroutines.flow.first(flow)
 }
-
-/** 小工具：给 Flow<T> 取首个值（DataStore 用）。 */
-private suspend fun <T> kotlinx.coroutines.flow.first(flow: kotlinx.coroutines.flow.Flow<T>): T =
-   

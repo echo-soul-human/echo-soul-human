@@ -227,10 +227,8 @@ class RealtimeClient @Inject constructor(
     }
 
     /** 长连接 URL：带 apikey 与 access_token（RLS 决定订阅哪个账号的频道）。 */
-    private fun realtimeUrl(): String? {
-        val token = runCatching {
-            kotlinx.coroutines.runBlocking { http.currentToken() }
-        }.getOrNull() ?: return null
+    private suspend fun realtimeUrl(): String? {
+        val token = runCatching { http.currentToken() }.getOrNull() ?: return null
         val base = AppConfig.supabaseUrl
             .replaceFirst("https://", "wss://")
             .replaceFirst("http://", "ws://")
