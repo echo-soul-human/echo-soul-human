@@ -7,12 +7,12 @@
  * 检查没错，是生成不确定。这道脚本把"确定性"本身变成可验证的约束。
  *
  * 做法：快照 → 重跑全部生成器 → 比对字节。
- * 用法：node scripts/check-deterministic.mjs
+ * 用法：node scripts/gen-* 之外只跑这个：node scripts/check-deterministic.mjs
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 
 const ROOT = process.cwd();
 
@@ -23,15 +23,37 @@ const GENERATED = [
   'web/src/app/tokens.generated.ts',
   'web/public/manifest.webmanifest',
   'web/public/version.json',
-  'web/src/types/generated/api.ts',
   'web/public/release-notes.json',
+  'web/src/types/generated/api.ts',
   'android/version.properties',
   'android/app/src/main/java/com/echosoul/app/ui/design/DesignTokens.kt',
+  'android/app/src/main/java/com/echosoul/app/api/Contract.kt',
   'web/src/app/version.ts',
+  // 目录项：32 篇协议 JSON，逐条列不现实
+  'web/public/legal/',
 ];
 
 /** 生成物里出现这些键就说明不确定性又溜回来了 */
-const NONDETERMINISTIC = [/generated_at/, /"generatedAt"\s*:/, /Date\.now\(\)/, /new Date\(\)\.toISOString/];
+const NONDETERMINISTIC = [
+  /generated_at/, /"generatedAt"\s*:/, /Date\.now\(\)/, /new Date\(\)\.toISOString/,
+];
+
+/** 展开目录项为其中全部文件（已排序，保证顺序可比） */
+function expand(entries) {
+  const out = [];
+  for (const e of entries) {
+    const abs = join(ROOT, e);
+    if (!existsSync(abs)) { out.push(e); continue; }   // 缺失项原样保留，便于报错
+    if (statSync(abs).isDirectory()) {
+      for (const f of readdirSync(abs).sort()) out.push(`${e}${f}`.replace(/\\/g, '/'));
+    } else {
+      out.push(e);
+    }
+  }
+  return out;
+}
+
+const FILES = expand(GENERATED);
 
 function sha(p) {
   if (!existsSync(join(ROOT, p))) return '<missing>';
@@ -40,7 +62,7 @@ function sha(p) {
 
 const problems = [];
 
-for (const p of GENERATED) {
+for (const p of FILES) {
   if (!existsSync(join(ROOT, p))) { problems.push(`缺少生成物：${p}`); continue; }
   const body = readFileSync(join(ROOT, p), 'utf8');
   for (const re of NONDETERMINISTIC) {
@@ -48,26 +70,24 @@ for (const p of GENERATED) {
   }
 }
 
-const before = GENERATED.map(sha);
+const before = FILES.map(sha);
 const run = (args) => execFileSync(process.execPath, args, { cwd: ROOT, stdio: 'pipe' }).toString();
 
 try {
   run(['scripts/gen-prefix-module.mjs']);
   run(['scripts/check-prefix.mjs', '--update']);
   run(['scripts/gen-tokens.mjs']);
+  run(['scripts/gen-legal.mjs']);
   run(['scripts/gen-manifest.mjs']);
   run(['scripts/gen-contract.mjs']);
 } catch (e) {
   problems.push('生成器执行失败：' + (e.stderr?.toString?.() || e.message));
 }
 
-const after = GENERATED.map(sha);
-for (let i = 0; i < GENERATED.length; i++) {
-  if (before[i] !== after[i]) {
-    problems.push(`重跑后内容变化：${GENERATED[i]}`);
-  }
+const after = FILES.map(sha);
+for (let i = 0; i < FILES.length; i++) {
+  if (before[i] !== after[i]) problems.push(`重跑后内容变化：${FILES[i]}`);
 }
-
 
 if (problems.length) {
   console.error('\n✗ check-deterministic: 生成物不确定\n');
@@ -78,4 +98,4 @@ if (problems.length) {
 }
 // 刻意不做 git checkout 回滚：那会把「尚未提交的合法修复」一起退掉，
 // 制造出比原问题更难查的假象。生成物本就该被提交，重跑等于修正。
-console.log(`✓ check-deterministic: ${GENERATED.length} 个生成物重跑后字节一致`);
+console.log(`✓ check-deterministic: ${FILES.length} 个生成物重跑后字节一致`);

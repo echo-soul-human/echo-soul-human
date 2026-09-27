@@ -47,6 +47,7 @@ jobs:
         run: |
           npm run gen:prefix
           npm run gen:tokens
+          npm run gen:legal
           npm run gen:manifest
 
       # ── 防线 3：静态前缀未被污染 ────────────────────────
@@ -69,6 +70,7 @@ jobs:
               web/src/app/tokens.generated.ts \
               web/public/manifest.webmanifest \
               web/public/version.json \
+              web/public/legal \
               android/version.properties \
               android/app/src/main/java/com/echosoul/app/ui/design/DesignTokens.kt
           then

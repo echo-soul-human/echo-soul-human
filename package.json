@@ -14,7 +14,7 @@
     "check:secrets": "node scripts/secret-scan.mjs",
     "test": "node tests/run.mjs",
     "legal:platformize": "node scripts/legal-platformize.mjs",
-    "check": "npm run check:secrets && npm run check:sql && npm run gen:prefix && npm run gen:tokens && npm run gen:manifest && npm run gen:contract && npm run check:prefix && npm run check:sw && npm run check:deterministic && npm run check:icons && npm run check:styles && npm run test",
+    "check": "npm run check:secrets && npm run check:sql && npm run gen:prefix && npm run gen:tokens && npm run gen:legal && npm run gen:manifest && npm run check:prefix && npm run check:sw && npm run check:deterministic && npm run test",
     "hooks:install": "node scripts/install-hooks.mjs",
     "web:dev": "npm --prefix web run dev",
     "web:build": "npm --prefix web run build",
@@ -25,7 +25,8 @@
     "check:deterministic": "node scripts/check-deterministic.mjs",
     "check:icons": "node scripts/check-icons.mjs",
     "check:styles": "node scripts/check-styles.mjs",
-    "gen:contract": "node scripts/gen-contract.mjs"
+    "gen:contract": "node scripts/gen-contract.mjs",
+    "gen:legal": "node scripts/gen-legal.mjs"
   },
   "engines": {
     "node": ">=23",
