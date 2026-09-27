@@ -12,17 +12,17 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="星回" />
     <!-- iOS 主屏图标必须不透明底：带透明会在圆角遮罩下出现黑边 -->
-    <link rel="apple-touch-icon" href="/apple-icons/152.png" sizes="152x152" />
-    <link rel="apple-touch-icon" href="/apple-icons/167.png" sizes="167x167" />
-    <link rel="apple-touch-icon" href="/apple-icons/180.png" sizes="180x180" />
+    <link rel="apple-touch-icon" href="%BASE_URL%apple-icons/152.png" sizes="152x152" />
+    <link rel="apple-touch-icon" href="%BASE_URL%apple-icons/167.png" sizes="167x167" />
+    <link rel="apple-touch-icon" href="%BASE_URL%apple-icons/180.png" sizes="180x180" />
 
     <!--
       %BASE_URL% 由 Vite 按 vite.config 的 base 自动替换。
-      不要写死 /echosoul/ —— profile 仓库的 Pages 挂在根路径，写死会整站 404，
-      而且症状是白屏无报错。base 的来源见 scripts/pages-base.mjs。
+      不要写死 /echosoul/ —— base 是按仓库形态推导出来的（scripts/pages-base.mjs），
+      写死的症状是整站资源 404 且白屏无报错，极难查。
     -->
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="%BASE_URL%icons/icon-192.png" />
     <meta name="theme-color" content="#FBF8F6" />
 
     <!--
