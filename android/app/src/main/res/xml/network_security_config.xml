@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  网络安全配置：只允许 HTTPS。
+  ★ 这里**不做任何证书绕过 / 信任用户 CA / 信任所有**。分册 §3 明写这是被点名的坑，
+    CI（scripts/secret-scan.mjs + 代码审查）要拦的是 TrustAllX509TrustManager 与自定义
+    SSLSocketFactory，不是这个文件。debug 抓包请用系统级代理证书方案，不要往这里加例外。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Supabase 与 GitHub 直链分发域都走 TLS；domain 用通配以适配自建域名。 -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">supabase.co</domain>
+        <domain includeSubdomains="true">supabase.in</domain>
+        <domain includeSubdomains="true">githubusercontent.com</domain>
+        <domain includeSubdomains="true">github.io</domain>
+    </domain-config>
+</network-security-config>

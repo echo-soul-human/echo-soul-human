@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin, type ResolvedConfig } from 'vite';
+import { defineConfig, loadEnv, type Plugin, type ResolvedConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -35,9 +35,43 @@ const spa404: Plugin = {
   },
 };
 
+/**
+ * ★ 构建期配置断言：缺运行时必需的 VITE_ 变量就让 build 失败。
+ *
+ * 为什么必须有这条：Vite 会把 import.meta.env.VITE_X 内联成字面量。
+ * 缺配置时 supabase.ts 里的
+ *     supabaseConfigError ? new Proxy(...) : createClient(...)
+ * 会被**常量折叠**成永远走 Proxy 分支，createClient 当死代码被摇掉 ——
+ * 实测结果：supabase-js 整个从产物里消失（217KB → 0），
+ * 而 vite build 依然报成功，check-bundle 还因为"代码少了"而虚假达标。
+ * 一个跑不了的包不能算构建成功。
+ *
+ * dev 模式不拦：运行时那张可读的错误页比命令行红字对开发者更有用。
+ */
+const REQUIRED_ENV = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'] as const;
+
+const requireRuntimeConfig: Plugin = {
+  name: 'echosoul:require-runtime-config',
+  apply: 'build',
+  configResolved(cfg: ResolvedConfig) {
+    // 注意：这里不能用 this.error() —— configResolved 的 this 上没有该方法，
+    // 抛出来的会是一句无意义的 TypeError，把真正的原因盖掉。
+    const env = loadEnv(cfg.mode, cfg.root, 'VITE_');
+    const missing = REQUIRED_ENV.filter((k) => !String(env[k] ?? process.env[k] ?? '').trim());
+    if (missing.length) {
+      throw new Error(
+        `\n构建被拒绝：缺少运行时必需的环境变量 ${missing.join(', ')}。\n` +
+        '  缺了它们不会报错，只会产出一个打不开任何会话的空壳包\n' +
+        '  （supabase-js 会被常量折叠摇掉，实测 217KB → 0）。\n' +
+        '  本地：在 web/.env.local 里填；CI：仓库 Settings → Secrets and variables → Actions。\n',
+      );
+    }
+  },
+};
+
 export default defineConfig({
   base: BASE,
-  plugins: [react(), spa404],
+  plugins: [react(), spa404, requireRuntimeConfig],
 
   // 构建号注入 <meta name="x-build">，运行时轮询 /version 比对后提示刷新
   define: {

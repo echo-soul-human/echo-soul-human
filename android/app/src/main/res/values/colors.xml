@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  色值必须与 shared/tokens/design.tokens.json 一致。这里是**系统层**用的那份
+  （窗口底色、状态栏、图标背景），Compose 侧的完整 token 在生成物 DesignTokens.kt。
+  两处各写一套是必要的恶：系统窗口底色在 Compose 挂载之前就要生效，否则冷启动白闪。
+-->
+<resources>
+    <color name="window_bg">#FBF8F6</color>
+    <color name="window_bg_warm">#F4EDE8</color>
+    <color name="ic_launcher_background">#FBF8F6</color>
+    <color name="brand_blue">#7FB6D9</color>
+    <color name="brand_blue_deep">#4E88AE</color>
+    <color name="brand_blue_press">#3E6F92</color>
+    <color name="brand_pink">#F2A9B8</color>
+    <color name="ink">#2B2622</color>
+</resources>

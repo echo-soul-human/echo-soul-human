@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  权限按 docs/分册-安卓端.md §13 的时机表声明。
+  ★ 这里出现的每一项都必须能对上 §13 的一行；多要一个权限就多一分被拒和被截图挂的风险。
+  明确不申请：通讯录、位置、通话记录、短信、相机、麦克风、相册全量读取。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 必需 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 长连接心跳：不做 WakeLock 拉满，只在同步窗口内短暂持有 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- 前台服务承载长连接（Android 9+ 需要 FOREGROUND_SERVICE） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Android 14+ 必须再声明服务类型权限，否则 startForeground 直接抛异常 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
+    <!-- Android 13+ 运行时权限：首次完成对话后才申请，不在启动时弹 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 通知轻震动（主动关怀），设置里可关 -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- 应用内更新：拉起系统安装器（点"立即更新"时才引导授予） -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- ★ 有意**不声明** RECEIVE_BOOT_COMPLETED：开机自启拉满属于分册 §5.3 明令禁止的流氓保活。
+         消息到达靠"长连接 + 打开时补发 + WorkManager 兜底"三层，不需要开机唤醒。 -->
+
+    <!-- 立绘/表情包上传只走系统图片选择器（ACTION_OPEN_DOCUMENT / Photo Picker），
+         因此**不声明**任何 READ_MEDIA_* 全量读取权限。这是有意的：不需要就不申请。 -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" android:maxSdkVersion="32" />
+
+    <queries>
+        <!-- 检查是否有可用的浏览器（更新降级跳转）与安装器 -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.REQUEST_INSTALL_PACKAGES" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".app.EchoSoulApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.EchoSoul"
+        android:networkSecurityConfig="@xml/network_security_config"
+        tools:targetApi="35">
+
+        <activity
+            android:name=".app.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|density|navigation"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.EchoSoul.Launch">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- 分享链接回跳：resolve_share 归因需要真实 URL，不能用自定义 scheme 兜圈子 -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="echosoul" android:host="open" />
+            </intent-filter>
+        </activity>
+
+        <!-- 长连接宿主服务。★ foregroundServiceType 必须是 remoteMessaging：
+             Android 14+ 类型选错或漏写在 startForeground() 时崩溃。
+             exported=false：只由本应用启动。stopWithTask=false 让划掉最近任务时
+             服务不被立刻带走（补发仍靠 WorkManager + 打开时拉取）。 -->
+        <service
+            android:name=".realtime.RealtimeService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="remoteMessaging"
+            android:stopWithTask="false" />
+
+        <!-- TTS 播放的锁屏控制（MediaSession 宿主）。未启用媒体按钮外部拉起，故 exported=false。 -->
+        <service
+            android:name=".svc.TtsPlaybackService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <!-- 通知点击的路由入口：只处理本应用自己发出的 PendingIntent，不导出。 -->
+        <receiver
+            android:name=".notif.NotificationActionReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- 下载完成广播只接自己的 DOWNLOAD_COMPLETE intent，且带 dataScheme 限制。 -->
+        <receiver
+            android:name=".update.DownloadCompleteReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- FileProvider：把缓存目录里的 APK 以 content:// 授权给系统安装器。
+             绝不共享 filesDir 根，只共享 apk/ 子目录（见 file_paths.xml）。 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- WorkManager 用默认初始化 + Hilt 的 WorkerFactory（app/EchoSoulApp 里配置）。
+             移除系统自动Initializer以免冷启动多做一遍无谓工作（P0：Application 里不做 IO）。 -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="remove" />
+
+    </application>
+</manifest>

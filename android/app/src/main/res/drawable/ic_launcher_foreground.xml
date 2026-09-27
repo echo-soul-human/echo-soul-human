@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  品牌图形：两个重叠的圆（人与 AI 的交汇）+ 心形意象，浅蓝与心跳粉。
+  这里是矢量而非位图 —— 包体目标 ≤25MB，图标不该占几百 KB（分册 §8）。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 人（暖粉），偏左 -->
+    <path
+        android:fillColor="#F2A9B8"
+        android:pathData="M44,54m-21,0a21,21 0,1 1,42 0a21,21 0,1 1,-42 0" />
+    <!-- AI（星蓝），偏右，与前者交叠 -->
+    <path
+        android:fillColor="#7FB6D9"
+        android:fillAlpha="0.85"
+        android:pathData="M64,54m-21,0a21,21 0,1 1,42 0a21,21 0,1 1,-42 0" />
+    <!-- 交叠处的心形：真正被看见的是重合的那一块 -->
+    <path
+        android:fillColor="#3E6F92"
+        android:pathData="M54,62c-5.5,-4.6 -9,-8.1 -9,-12c0,-3.2 2.5,-5.6 5.6,-5.6c1.5,0 2.8,0.6 3.4,1.6c0.6,-1 1.9,-1.6 3.4,-1.6c3.1,0 5.6,2.4 5.6,5.6c0,3.9 -3.5,7.4 -9,12z" />
+</vector>

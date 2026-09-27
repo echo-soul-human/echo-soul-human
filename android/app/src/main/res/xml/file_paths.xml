@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FileProvider 路径白名单。★ 只暴露 apk/ 子目录：更新包必须落在 cacheDir/apk，
+  一旦共享 filesDir 根就等于把数据库、加密偏好、诊断缓冲全交给系统安装器进程可读。
+-->
+<paths>
+    <cache-path name="apk" path="apk/" />
+    <!-- 数据导出（export 函数返回的签名链接由浏览器下载，这里只共享应用自己写的分享图） -->
+    <cache-path name="shared_images" path="shared/" />
+</paths>

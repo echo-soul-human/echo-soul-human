@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  纸张纹理：512px 灰度噪点，运行时叠在纸色上（TextureBrush 用）。
+  ★ 不用大图（分册 §9）。真机上应替换为**子集化后的低透明度位图**；
+    这张占位图的存在意义是让低端机降级路径有东西可关 —— 关掉时根本不加载它。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path
+        android:fillColor="#FFF3EDE7"
+        android:pathData="M0,0h64v64H0z" />
+    <path
+        android:fillColor="#14000000"
+        android:pathData="M8,12h2v2H8zM24,6h2v2h-2zM40,18h2v2h-2zM52,34h2v2h-2zM14,44h2v2h-2zM32,52h2v2h-2zM46,48h2v2h-2zM20,28h2v2h-2zM56,8h2v2h-2zM4,34h2v2H4z" />
+</vector>

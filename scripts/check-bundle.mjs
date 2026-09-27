@@ -97,8 +97,39 @@ if (fontTotal > 1.2 * 1024 * 1024) {
   console.log(`  ✓ 字体合计 ${(fontTotal / 1024).toFixed(0)}KB`);
 }
 
+/* ── 关键依赖必须真的在产物里 ─────────────────────────────
+   体积变小有两种原因：优化到位，或者代码被摇掉了。
+   实测过一次：缺 VITE_SUPABASE_URL 时 supabase-js 整个消失（217KB → 0），
+   体积闸门因此虚假达标。**丢代码不是优化**，所以正面断言它存在。      */
+const REQUIRED_MARKERS = [
+  { name: '@supabase/supabase-js', needle: 'X-Client-Info', minBytes: 60_000 },
+  { name: 'react', needle: 'Minified React error', minBytes: 40_000 },
+];
+
+const allJs = js.map((f) => ({ f, body: readFileSync(f, 'utf8'), bytes: statSync(f).size }));
+
+for (const r of REQUIRED_MARKERS) {
+  const hit = allJs.find((x) => x.body.includes(r.needle));
+  if (!hit) {
+    console.log(`  ✗ 产物里找不到 ${r.name}（标记串 ${r.needle}）—— 依赖被摇掉通常意味着构建期缺环境变量`);
+    fail = true;
+  } else if (hit.bytes < r.minBytes) {
+    console.log(`  ✗ ${r.name} 所在 chunk 仅 ${(hit.bytes / 1024).toFixed(1)}KB，低于预期 ${r.minBytes / 1024}KB`);
+    fail = true;
+  }
+}
+
+// 近空 chunk 是"某个 manualChunks 分支没东西可放"的信号，不是无害噪音
+for (const x of allJs) {
+  if (x.bytes < 40) {
+    console.log(`  ✗ 近空 chunk：${x.f.replace(OUT + '/', '')}（${x.bytes}B）—— 依赖被摇掉或分组失效`);
+    fail = true;
+  }
+}
+
 if (fail) {
-  console.error('\n✗ 超出预算。见 docs/分册-网页端.md §10 的手段：路由级 lazy、重依赖异步、图片 WebP + 显式宽高。\n');
+  console.error('\n✗ 未达标。体积超预算的手段见 docs/分册-网页端.md §10；'
+    + '依赖缺失请先检查构建时 VITE_ 环境变量是否配齐（vite.config 已加构建期断言）。\n');
   process.exit(1);
 }
-console.log('\n✓ 体积预算全部达标');
+console.log('\n✓ 体积预算与依赖完整性均达标');
