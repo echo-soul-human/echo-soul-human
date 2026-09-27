@@ -23,6 +23,7 @@ const GENERATED = [
   'web/src/app/tokens.generated.ts',
   'web/public/manifest.webmanifest',
   'web/public/version.json',
+  'web/public/release-notes.json',
   'android/version.properties',
   'android/app/src/main/java/com/echosoul/app/ui/design/DesignTokens.kt',
   'web/src/app/version.ts',

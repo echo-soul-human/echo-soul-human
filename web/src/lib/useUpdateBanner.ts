@@ -8,12 +8,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { APP_BUILD } from '../app/version';
 
-interface VersionInfo { web?: { build?: string; force_refresh?: boolean } }
+interface VersionInfo {
+  web?: { build?: string; force_refresh?: boolean; notes_file?: string };
+}
+
+interface NotesInfo { build?: string; version?: string; items?: string[] }
 
 const POLL_MS = 5 * 60_000;
 
 export function useUpdateBanner(): { text: string; apply: () => void } | null {
   const [pending, setPending] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -27,6 +32,16 @@ export function useUpdateBanner(): { text: string; apply: () => void } | null {
         const build = v.web?.build;
         if (!alive || !build || build === APP_BUILD) return;
         setPending(build);
+
+        // 说明取不到也要提示更新 —— 提示的优先级高于文案
+        try {
+          const file = v.web?.notes_file ?? 'release-notes.json';
+          const nr = await fetch(`${import.meta.env.BASE_URL}${file}`, { cache: 'no-store' });
+          if (!nr.ok) return;
+          const n = (await nr.json()) as NotesInfo;
+          const first = (n?.items ?? [])[0];
+          if (alive && first) setNote(first);
+        } catch { /* 静默，保留短文案 */ }
       } catch {
         /* 轮询失败静默：不打扰用户 */
       }
@@ -48,5 +63,5 @@ export function useUpdateBanner(): { text: string; apply: () => void } | null {
   const apply = useCallback(() => window.location.reload(), []);
 
   if (!pending) return null;
-  return { text: '有新版本，点这里刷新', apply };
+  return { text: note ? `新版本：${note}（点这里刷新）` : '有新版本，点这里刷新', apply };
 }

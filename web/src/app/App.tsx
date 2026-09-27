@@ -30,16 +30,20 @@ export default function Shell() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  if (!ready) return <div className="app-shell" aria-busy="true" />;
-  if (!session) return <AuthGate />;
+  // 横幅必须在鉴权门之外：未登录时它同样要出现 —— 停在登录页的旧构建用户
+  // 和从主屏回来的 iOS 用户都属于这一类，藏进登录后的分支里就等于没有。
+  const bannerEl = banner ? (
+    <button type="button" className="update-banner" onClick={banner.apply}>
+      {banner.text}
+    </button>
+  ) : null;
+
+  if (!ready) return <div className="app-shell" aria-busy="true">{bannerEl}</div>;
+  if (!session) return <>{bannerEl}<AuthGate /></>;
 
   return (
     <div className="app-shell">
-      {banner ? (
-        <button type="button" className="update-banner" onClick={banner.apply}>
-          {banner.text}
-        </button>
-      ) : null}
+      {bannerEl}
       <Outlet />
     </div>
   );

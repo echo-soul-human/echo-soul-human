@@ -18,6 +18,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { resolveBase } from './pages-base.mjs';
+import { latestNotes } from './release-notes.mjs';
 
 const ROOT = process.cwd();
 const src = JSON.parse(readFileSync(join(ROOT, 'manifest.json'), 'utf8'));
@@ -72,7 +73,14 @@ const webmanifest = {
  * 需要时间戳请由运行时的 /version Edge Function 自己加。
  */
 const versionJson = {
-  web: { build: web.build, force_refresh: web.force_refresh, notes_file: src.release_notes_file },
+  web: {
+    build: web.build,
+    force_refresh: web.force_refresh,
+    // 必须指向**已发布**的产物：以前写的是仓库根的 RELEASE_NOTES.md，
+    // 站点上没这个文件，更新弹窗永远拿不到"更新了什么"
+    notes_file: 'release-notes.json',
+    notes_source: src.release_notes_file,
+  },
   android: {
     version_name: android.version_name,
     version_code: android.version_code,
@@ -80,9 +88,25 @@ const versionJson = {
   },
 };
 
+const notesSrcPath = join(ROOT, src.release_notes_file ?? 'RELEASE_NOTES.md');
+if (!existsSync(notesSrcPath)) {
+  console.error(`✗ 找不到 ${src.release_notes_file} —— 更新说明的唯一来源不能缺`);
+  process.exit(1);
+}
+const notes = latestNotes(readFileSync(notesSrcPath, 'utf8'));
+if (!notes) {
+  console.error(`✗ ${src.release_notes_file} 里没有符合 "## <版本> · <日期>" + "- 条目" 的段落`);
+  process.exit(1);
+}
+
 const writes = [
   ['web/public/manifest.webmanifest', JSON.stringify(webmanifest, null, 2) + '\n'],
   ['web/public/version.json', JSON.stringify(versionJson, null, 2) + '\n'],
+  ['web/public/release-notes.json', JSON.stringify({
+    build: web.build,
+    version: notes.version,
+    items: notes.items,
+  }, null, 2) + '\n'],
   ['android/version.properties', [
     '# 由 scripts/gen-manifest.mjs 生成，禁止手写',
     `versionName=${android.version_name}`,

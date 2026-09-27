@@ -214,6 +214,38 @@ t('base 含 < 时转义，不能提前闭合 <script>', () => {
   truthy(html.includes('\\u003c'));
 });
 
+// ── 发布说明解析 ─────────────────────────────────────────
+// gen-manifest 的「源文件没有可用段落就报错退出」依赖这里，解析器错了守卫就是摆设。
+console.log('\n[release notes]');
+const { parseReleaseNotes, latestNotes } = await import('../scripts/release-notes.mjs');
+
+const NOTES = `# 发布说明
+## 0.2.0 · 2026-10-01
+- 它现在记得更久了
+- 加了三种音色
+---
+## 0.1.0 · 未发布
+- 内部开发版本
+<!--
+写作约定
+- 这条在注释里，不该被当成更新条目
+-->
+`;
+
+t('按出现顺序解析出版本段', () => {
+  const all = parseReleaseNotes(NOTES);
+  eq(all.length, 2);
+  eq(all[0].version, '0.2.0');
+  eq(all[1].version, '0.1.0');
+});
+t('条目只收本段以 - 起头的行', () =>
+  eq(JSON.stringify(parseReleaseNotes(NOTES)[0].items), '["它现在记得更久了","加了三种音色"]'));
+t('注释块里的 - 行不当作用户可见条目', () =>
+  truthy(!parseReleaseNotes(NOTES).some((s) => s.items.some((i) => i.includes('不该被当成')))));
+t('latestNotes 取最新一段', () => eq(latestNotes(NOTES).version, '0.2.0'));
+t('没有可用段落时返回 null（让生成器报错而不是发空清单）', () =>
+  eq(latestNotes('# 只有标题\n没有段落\n'), null));
+
 // ───────────────────────────────────────────────────────
 console.log('\n' + '='.repeat(52));
 if (failures.length) {
