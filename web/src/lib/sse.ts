@@ -8,44 +8,17 @@
  *   4. 组件卸载**不得** abort 请求 —— 服务端还在生成并落库，中断显示不等于中断生成
  */
 import { fnUrl, accessToken } from './supabase';
+// 字段表来自 shared/contract/api.json（0-20）。这里以前是手抄的一份，
+// 服务端改字段这边不会报错，只会在运行时拿到 undefined。
+import type { ChatMeta, ChatDone, ChatError, ChatEvent, ByokRef } from '../types/generated/api';
 
-export interface ChatMeta {
-  message_id: string;
-  user_message_id?: string | null;
-  model: string;
-  provider: string;
-  frozen: number;
-  carried_tokens: number;
-  byok: boolean;
-  replay?: boolean;
-}
-
-export interface ChatDone {
-  usage?: { promptTokens: number; completionTokens: number; cachedTokens: number };
-  settled?: number;
-  refunded?: number;
-  balance?: number | null;
-  cache_hit?: boolean;
-  replay?: boolean;
-}
-
-export interface ChatError {
-  code: string;
-  msg: string;
-  partial?: boolean;
-}
-
-export type ChatEvent =
-  | { type: 'meta'; data: ChatMeta }
-  | { type: 'delta'; text: string }
-  | { type: 'done'; data: ChatDone }
-  | { type: 'error'; data: ChatError };
+export type { ChatMeta, ChatDone, ChatError, ChatEvent };
 
 export interface ChatParams {
   sessionId: string;
   content: string;
   requestId: string;
-  provider?: { kind: 'openai' | 'anthropic'; profile_id: string } | null;
+  provider?: ByokRef | null;
   onEvent: (e: ChatEvent) => void;
   signal?: AbortSignal;
 }

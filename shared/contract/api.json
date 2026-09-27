@@ -1,0 +1,80 @@
+{
+  "_note": "跨端接口的唯一真源（开发任务 0-20）。浏览器与安卓都从这里生成，禁止在任何一端手写第二份字段表。字段名一律用线上协议里的原样（snake_case），因为一旦生成端做驼峰改名，抓包、服务端与客户端就对不上话。",
+  "_provenance": {
+    "chatRequest": "supabase/functions/chat/index.ts 的 Body",
+    "events": "chat/index.ts 里 send('meta'|'delta'|'done'|'error') 的实参",
+    "usage": "_shared/providers/types.ts 的 Usage（camelCase，已核实非注释）",
+    "tier": "migrations 里 public.tier_t 的取值",
+    "errorCodes": "chat/index.ts 的 json(...) 返回码 + web 侧 messageFor 的分支"
+  },
+  "enums": {
+    "Client": ["web", "android", "ios-webapp"],
+    "Tier": ["free", "lite", "pro", "pro_plus", "ultra"],
+    "ProviderKind": ["openai", "anthropic"],
+    "ErrorCode": [
+      "NETWORK",
+      "RESUME_FAILED",
+      "MODEL_STREAM_BREAK",
+      "BAD_JSON",
+      "EMPTY_CONTENT",
+      "CONTENT_TOO_LONG",
+      "METHOD_NOT_ALLOWED",
+      "UNAUTHORIZED",
+      "NO_ENTITLEMENT",
+      "SESSION_NOT_FOUND",
+      "SESSION_EMPTY",
+      "INSUFFICIENT_BALANCE",
+      "LEDGER_ERROR",
+      "RATE_LIMITED",
+      "BYOK_NOT_FOUND",
+      "ENDPOINT_BLOCKED",
+      "PROVIDER_CONFIG",
+      "UPSTREAM_5XX"
+    ]
+  },
+  "objects": {
+    "Usage": [
+      { "name": "promptTokens", "type": "int" },
+      { "name": "completionTokens", "type": "int" },
+      { "name": "cachedTokens", "type": "int", "_": "命中缓存的输入 token；拿不到填 0，但必须显式存在" }
+    ],
+    "ByokRef": [
+      { "name": "kind", "type": "ProviderKind" },
+      { "name": "profile_id", "type": "uuid" }
+    ],
+    "ChatRequest": [
+      { "name": "session_id", "type": "uuid" },
+      { "name": "content", "type": "string", "_": "服务端限长 8000 字符" },
+      { "name": "idempotency_key", "type": "uuid", "_": "重试必须复用同一个，否则重复扣费" },
+      { "name": "client", "type": "Client", "optional": true },
+      { "name": "provider", "type": "ByokRef", "optional": true, "_": "缺省即走平台内置 DeepSeek" },
+      { "name": "attachments", "type": "string[]", "optional": true }
+    ],
+    "ChatMeta": [
+      { "name": "message_id", "type": "uuid" },
+      { "name": "user_message_id", "type": "uuid", "optional": true, "nullable": true },
+      { "name": "model", "type": "string" },
+      { "name": "provider", "type": "string" },
+      { "name": "frozen", "type": "number", "_": "本轮预冻结的人民币额度" },
+      { "name": "carried_tokens", "type": "int" },
+      { "name": "byok", "type": "boolean" },
+      { "name": "replay", "type": "boolean", "optional": true, "_": "幂等重放：同 idempotency_key 命中已落库的回答" }
+    ],
+    "ChatDelta": [
+      { "name": "t", "type": "string", "_": "增量文本。键名故意短：一帧一个 token，长回复时这层开销是实打实的" }
+    ],
+    "ChatDone": [
+      { "name": "usage", "type": "Usage", "optional": true },
+      { "name": "settled", "type": "number", "optional": true },
+      { "name": "refunded", "type": "number", "optional": true },
+      { "name": "balance", "type": "number", "optional": true, "nullable": true },
+      { "name": "cache_hit", "type": "boolean", "optional": true },
+      { "name": "replay", "type": "boolean", "optional": true }
+    ],
+    "ChatError": [
+      { "name": "code", "type": "string", "_": "取值见 ErrorCode 枚举；类型留 string，为的是新增码不把旧客户端编译打断" },
+      { "name": "msg", "type": "string", "_": "给用户看的话，不是日志" },
+      { "name": "partial", "type": "boolean", "optional": true, "_": "true 表示已产出的部分要保留显示，并给续接入口" }
+    ]
+  }
+}

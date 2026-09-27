@@ -44,7 +44,7 @@ jobs:
 
       - run: npm ci --no-audit --no-fund
       - name: Regenerate artifacts (base 在此步按仓库形态推导)
-        run: npm run gen:prefix && npm run gen:tokens && npm run gen:manifest
+        run: npm run gen:prefix && npm run gen:tokens && npm run gen:manifest && npm run gen:contract
 
       # 前端可暴露的只有公开键，靠 RLS 兜底；绝不能注入 service_role / 模型 Key
       - name: Build web

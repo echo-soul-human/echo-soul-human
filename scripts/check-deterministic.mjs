@@ -23,6 +23,7 @@ const GENERATED = [
   'web/src/app/tokens.generated.ts',
   'web/public/manifest.webmanifest',
   'web/public/version.json',
+  'web/src/types/generated/api.ts',
   'web/public/release-notes.json',
   'android/version.properties',
   'android/app/src/main/java/com/echosoul/app/ui/design/DesignTokens.kt',
@@ -55,6 +56,7 @@ try {
   run(['scripts/check-prefix.mjs', '--update']);
   run(['scripts/gen-tokens.mjs']);
   run(['scripts/gen-manifest.mjs']);
+  run(['scripts/gen-contract.mjs']);
 } catch (e) {
   problems.push('生成器执行失败：' + (e.stderr?.toString?.() || e.message));
 }

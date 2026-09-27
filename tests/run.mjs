@@ -246,6 +246,28 @@ t('latestNotes 取最新一段', () => eq(latestNotes(NOTES).version, '0.2.0'));
 t('没有可用段落时返回 null（让生成器报错而不是发空清单）', () =>
   eq(latestNotes('# 只有标题\n没有段落\n'), null));
 
+// ── 跨端契约同源（0-20）──────────────────────────────────
+// 两端同源是这份契约存在的全部理由；不同源就只是把三处手抄变成四处。
+console.log('\n[contract parity]');
+const { readFileSync: rf } = await import('node:fs');
+const contract = JSON.parse(rf('shared/contract/api.json', 'utf8'));
+const tsApi = rf('web/src/types/generated/api.ts', 'utf8');
+const ktApi = rf('android/app/src/main/java/com/echosoul/app/api/Contract.kt', 'utf8');
+
+for (const [name, fields] of Object.entries(contract.objects)) {
+  t(`${name} 两端都生成了`, () => truthy(
+    tsApi.includes(`interface ${name} {`) && ktApi.includes(`data class ${name}(`), '缺一侧'));
+  for (const f of fields) {
+    t(`${name}.${f.name} 两端字段名一致`, () => truthy(
+      new RegExp(`^\\s+${f.name}\\??:`, 'm').test(tsApi) && new RegExp(`^\\s+val ${f.name}:`, 'm').test(ktApi),
+      '字段缺侧'));
+  }
+}
+t('ErrorCode 的每个值都进了 TS 联合类型', () => truthy(
+  contract.enums.ErrorCode.every((c) => tsApi.includes(`"${c}"`))));
+t('Tier 枚举两端都有', () => truthy(['free', 'lite', 'pro', 'pro_plus', 'ultra']
+  .every((v) => tsApi.includes(`"${v}"`) && ktApi.includes(`("${v}")`))));
+
 // ───────────────────────────────────────────────────────
 console.log('\n' + '='.repeat(52));
 if (failures.length) {
