@@ -14,13 +14,14 @@
     "check:secrets": "node scripts/secret-scan.mjs",
     "test": "node tests/run.mjs",
     "legal:platformize": "node scripts/legal-platformize.mjs",
-    "check": "npm run check:secrets && npm run check:sql && npm run gen:prefix && npm run check:prefix && npm run check:sw && npm run test",
+    "check": "npm run check:secrets && npm run check:sql && npm run gen:prefix && npm run gen:tokens && npm run check:prefix && npm run check:sw && npm run test",
     "hooks:install": "node scripts/install-hooks.mjs",
     "web:dev": "npm --prefix web run dev",
     "web:build": "npm --prefix web run build",
     "android:open": "start android",
     "verify:db": "node scripts/verify-db.mjs",
-    "migrate": "node --env-file=.env scripts/migrate.mjs"
+    "migrate": "node --env-file=.env scripts/migrate.mjs",
+    "gen:tokens": "node scripts/gen-tokens.mjs"
   },
   "engines": {
     "node": ">=23",

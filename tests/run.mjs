@@ -133,6 +133,27 @@ for (const ip of ['8.8.8.8', '1.1.1.1', '172.32.0.1', '192.169.1.1', '2001:4860:
 }
 t('malformed ipv4 treated as unsafe', () => truthy(isPrivateIp('999.1.1.1')));
 
+// ── Pages base 推导 ──────────────────────────────────────
+console.log('\n[pages base]');
+const { normalizeBase, baseFromRepository, resolveBase } = await import(
+  '../scripts/pages-base.mjs');
+
+t('normalizeBase 补前导与尾斜杠', () => eq(normalizeBase('echosoul'), '/echosoul/'));
+t('normalizeBase 空值归一为根路径', () => eq(normalizeBase(''), '/'));
+t('normalizeBase 保留已有尾斜杠', () => eq(normalizeBase('/a/b/'), '/a/b/'));
+t('profile 仓库（repo 名等于 owner）推导为根路径', () =>
+  eq(baseFromRepository({ GITHUB_REPOSITORY: 'echo-soul-human/echo-soul-human' }), '/'));
+t('profile 仓库判定大小写不敏感', () =>
+  eq(baseFromRepository({ GITHUB_REPOSITORY: 'FooBar/foobar' }), '/'));
+t('普通仓库推导为 /<repo>/', () =>
+  eq(baseFromRepository({ GITHUB_REPOSITORY: 'echo-soul-human/echosoul' }), '/echosoul/'));
+t('无 GITHUB_REPOSITORY 返回 null 交回上层', () =>
+  eq(baseFromRepository({}), null));
+t('ECHOSOUL_BASE 显式覆盖优先级最高', () =>
+  eq(resolveBase({ env: { ECHOSOUL_BASE: '/x', GITHUB_REPOSITORY: 'a/a' } }).base, '/x/'));
+t('推导命中时来源标记为 GITHUB_REPOSITORY', () =>
+  eq(resolveBase({ env: { GITHUB_REPOSITORY: 'o/r' } }).source, 'GITHUB_REPOSITORY'));
+
 // ───────────────────────────────────────────────────────
 console.log('\n' + '='.repeat(52));
 if (failures.length) {

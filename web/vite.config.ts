@@ -3,19 +3,22 @@ import react from '@vitejs/plugin-react';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { resolveBase } from '../scripts/pages-base.mjs';
 
 /**
- * base 必须等于 manifest.json 的 web.base_path。
- * 三处路径（manifest id / scope / base）不一致会导致 PWA 安装状态丢失，
- * gen-manifest.mjs 末尾有一致性自检兜底，这里再声明一次来源。
+ * base 与 PWA 的 id/scope/start_url 必须完全一致，否则资源 404、PWA 装不上。
+ * 而且 profile 仓库（仓库名等于 owner）的 Pages 挂在**根路径**，
+ * 所以这里不能照抄 manifest.web.base_path —— 必须和 gen-manifest.mjs
+ * 共用同一个推导逻辑，两边算出来的值才不会分叉。
  */
 const here = dirname(fileURLToPath(import.meta.url));
 const rootManifest = JSON.parse(
   readFileSync(resolve(here, '../manifest.json'), 'utf8'),
 );
+const { base: BASE } = resolveBase({ manifestPath: 'manifest.json', cwd: resolve(here, '..') });
 
 export default defineConfig({
-  base: rootManifest.web.base_path,
+  base: BASE,
   plugins: [react()],
 
   // 构建号注入 <meta name="x-build">，运行时轮询 /version 比对后提示刷新

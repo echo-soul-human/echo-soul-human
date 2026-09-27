@@ -17,6 +17,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { resolveBase } from './pages-base.mjs';
 
 const ROOT = process.cwd();
 const src = JSON.parse(readFileSync(join(ROOT, 'manifest.json'), 'utf8'));
@@ -29,6 +30,15 @@ if (!product.slug) {
   process.exit(1);
 }
 
+/**
+ * base 必须等于 Pages 实际挂载路径，否则资源 404、PWA 装不上。
+ * 仓库名等于 owner 时（profile / user-site 仓库）Pages 在**根路径**，
+ * 普通仓库在 /<repo>/ —— 所以这里推导而不是照抄 manifest。
+ */
+const { base: BASE, source: BASE_SOURCE } = resolveBase({
+  manifestPath: 'manifest.json', cwd: ROOT,
+});
+
 const ICONS = [
   { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
   { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -39,9 +49,9 @@ const ICONS = [
 const webmanifest = {
   name: product.name,
   short_name: product.name,
-  id: web.base_path,
-  start_url: `${web.base_path}?src=homescreen`,
-  scope: web.base_path,
+  id: BASE,
+  start_url: `${BASE}?src=homescreen`,
+  scope: BASE,
   display: 'standalone',
   display_override: ['standalone', 'minimal-ui'],
   orientation: 'portrait',
@@ -50,8 +60,8 @@ const webmanifest = {
   lang: 'zh-CN',
   icons: ICONS,
   shortcuts: [
-    { name: '继续上次对话', url: `${web.base_path}?s=resume` },
-    { name: '新建角色', url: `${web.base_path}?a=new` },
+    { name: '继续上次对话', url: `${BASE}?s=resume` },
+    { name: '新建角色', url: `${BASE}?a=new` },
   ],
 };
 
@@ -81,7 +91,7 @@ const writes = [
     `export const APP_BUILD = ${JSON.stringify(web.build)};`,
     `export const APP_NAME = ${JSON.stringify(product.name)};`,
     `export const APP_SLUG = ${JSON.stringify(product.slug)};`,
-    `export const BASE_PATH = ${JSON.stringify(web.base_path)};`,
+    `export const BASE_PATH = ${JSON.stringify(BASE)};`,
     '',
   ].join('\n')],
 ];
@@ -93,10 +103,13 @@ for (const [relPath, body] of writes) {
   console.log(`  ✓ ${relPath}`);
 }
 
-// 一致性自检：三处路径必须完全相同，否则 PWA 装不上或 scope 越界
-const paths = new Set([webmanifest.id, webmanifest.scope, web.base_path]);
-if (paths.size !== 1) {
-  console.error('\n✗ gen-manifest: id / scope / base_path 不一致 → PWA 安装状态会丢失\n');
+// base 形状校验：必须是 '/' 或 '/<repo>/'，不能带 query/hash，否则 PWA 装不上
+if (BASE !== '/' && !/^\/[a-z0-9][a-z0-9._-]*\/$/.test(BASE)) {
+  console.error(`\n✗ gen-manifest: base "${BASE}" 形状不合法（应为 "/" 或 "/<repo>/"，小写、无 query/hash）\n`);
   process.exit(1);
+}
+console.log(`  base = ${BASE}  (来源：${BASE_SOURCE})`);
+if (BASE === '/') {
+  console.log('  ℹ 根路径 = profile / user-site 仓库。注意该仓库的 README 会显示在你的 GitHub 个人主页上。');
 }
 console.log(`\n✓ gen-manifest: web ${web.build} · android ${android.version_name}(${android.version_code}) · ${product.slug}`);

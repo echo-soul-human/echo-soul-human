@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover 是安全区生效的前提；不用 user-scalable=no（伤无障碍） -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="星回 EchoSoul —— 有人回应的，才叫爱。" />
+
+    <!-- ── iOS 主屏 WebApp（不上架 App Store，所有 iOS 用户走这条路）── -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="星回" />
+    <!-- iOS 主屏图标必须不透明底：带透明会在圆角遮罩下出现黑边 -->
+    <link rel="apple-touch-icon" href="/apple-icons/152.png" sizes="152x152" />
+    <link rel="apple-touch-icon" href="/apple-icons/167.png" sizes="167x167" />
+    <link rel="apple-touch-icon" href="/apple-icons/180.png" sizes="180x180" />
+
+    <!--
+      %BASE_URL% 由 Vite 按 vite.config 的 base 自动替换。
+      不要写死 /echosoul/ —— profile 仓库的 Pages 挂在根路径，写死会整站 404，
+      而且症状是白屏无报错。base 的来源见 scripts/pages-base.mjs。
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <meta name="theme-color" content="#FBF8F6" />
+
+    <!--
+      字体：自托管 + 子集化，禁止引 Google Fonts（国内不稳且拖慢首屏）。
+      构建号 x-build 由 main.tsx 用生成的 APP_BUILD 常量写入，不在 HTML 里硬编码。
+    -->
+    <title>星回</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!--
+      首屏骨架：避免 JS 解析期间纯白屏。
+      颜色走 token 变量并带兜底值，皮肤切换时不会闪回默认色。
+    -->
+    <div id="boot" aria-hidden="true">
+      <div class="boot-mark">星回</div>
+      <div class="boot-bar"><i></i></div>
+    </div>
+    <style>
+      #boot {
+        position: fixed; inset: 0; display: grid; place-content: center; gap: 14px;
+        background: var(--c-paper, #FBF8F6); z-index: 9999;
+        transition: opacity .22s ease-out;
+      }
+      #boot.gone { opacity: 0; pointer-events: none; }
+      .boot-mark {
+        font: 500 20px/1 var(--f-display, serif);
+        color: var(--c-ink-soft, #5C5347); letter-spacing: .18em; text-align: center;
+      }
+      .boot-bar { width: 92px; height: 2px; margin: 0 auto; background: var(--c-hairline, #E3D8D0); overflow: hidden; border-radius: 2px; }
+      .boot-bar i { display: block; height: 100%; width: 40%; background: var(--c-blue, #7FB6D9); animation: bootslide 1.1s ease-in-out infinite; }
+      @keyframes bootslide { 0%{transform:translateX(-100%)} 100%{transform:translateX(250%)} }
+      @media (prefers-reduced-motion: reduce) { .boot-bar i { animation: none; width: 100%; } }
+    </style>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

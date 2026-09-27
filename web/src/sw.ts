@@ -30,7 +30,7 @@ function parse(data: string | null): PushPayload {
 }
 
 self.addEventListener('push', (event: PushEvent) => {
-  const p = parse(event.data?.text ?? null);
+  const p = parse(event.data?.text() ?? null);
 
   // 服务端已按角色合并（V5-9：同角色连发 5 条只出 1 条通知）。
   // tag 是二次保险：即使多条漏过合并，同 tag 也只保留一条。
@@ -40,7 +40,8 @@ self.addEventListener('push', (event: PushEvent) => {
       tag: p.tag ?? 'renji-message',
       icon: 'icons/icon-192.png',
       badge: 'icons/maskable-192.png',
-      image: p.image,
+      // NotificationOptions 类型里没有 image（非标准字段），需要图片走 ServiceWorkerNotificationExtend 另说
+
       data: { url: p.url ?? '/' },
       silent: false,
     }),
@@ -61,8 +62,7 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
         return c.focus();
       }
     }
-    if (await self.clients.openWindow(target)) return;
-    await self.clients.focus();
+    await self.clients.openWindow(target);
   })());
 });
 

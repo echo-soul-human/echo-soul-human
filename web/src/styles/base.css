@@ -1,0 +1,176 @@
+/**
+ * base.css — 全局基础样式与 iOS 适配
+ *
+ * 只允许消费 token 变量。任何十六进制色值都会被 stylelint 拦下
+ * （唯一例外是下面 @supports 回落里必须写的单位值，不是颜色）。
+ * 见 docs/分册-网页端.md §5 的 iOS 清单，逐条对应。
+ */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  /* 阻断 iOS 下拉触发 Safari 刷新手势 */
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--f-body);
+  font-size: 16px;            /* 低于 16px 时 iOS 聚焦输入框会自动放大且不缩回 */
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  /* iOS 中文渲染偏细，标题用 600 不用 700 */
+  font-synthesis: none;
+}
+
+/* ── §5.2 视口高度 ─────────────────────────────────────
+   100vh 在 iOS Safari 会把地址栏算进去导致溢出。
+   dvh 跟随动态地址栏；不支持的旧内核回落 -webkit-fill-available。 */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  /* 安全区：notch 与 home indicator */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+@supports not (height: 100dvh) {
+  .app-shell { height: -webkit-fill-available; }
+}
+
+/* 滚动容器只允许这一层。
+   任何"整页滚动 + 内层滚动"的嵌套在 iOS 上都会打架。 */
+.scroll-pane {
+  flex: 1 1 auto;
+  min-height: 0;             /* flex 子项要能收缩，否则 overflow 失效 */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── §5.4 手势与选中 ─────────────────────────────────── */
+.no-callout { -webkit-touch-callout: none; user-select: none; }
+/* 用户消息文本必须可选中复制（要截图分享） */
+.selectable { -webkit-touch-callout: default; user-select: text; }
+/* 不用 user-scalable=no：那会伤无障碍且有 WCAG 问题 */
+button, a, input, textarea { touch-action: manipulation; }
+
+/* ── 排版：角色侧衬线、用户侧无衬线 ────────────────────
+   这是"像不像真人"最省力的一招 —— 视觉上就区分了"我"和"TA" */
+.role-text {
+  font-family: var(--f-display);
+  letter-spacing: var(--ls-quote, 0.01em);
+}
+.user-text { font-family: var(--f-body); }
+
+h1, h2, h3 {
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+p { margin: 0; }
+
+/* ── 焦点可见性：自定义但绝不隐藏 ───────────────────── */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ── 按钮 ───────────────────────────────────────────── */
+.btn {
+  font: inherit;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  padding: var(--sp-3) var(--sp-5);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: transform var(--t-fast) var(--ease-out-soft),
+              background var(--t-fast) var(--ease-out-soft);
+}
+.btn:hover { background: var(--surface-sunken); }
+.btn:active { transform: scale(0.98); }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; }
+.btn-primary {
+  background: var(--button-primary-bg);
+  border-color: transparent;
+  color: var(--button-primary-fg);
+}
+
+/* ── 气泡 ───────────────────────────────────────────── */
+.bubble {
+  max-width: 78%;
+  padding: var(--sp-3) var(--sp-4);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-radius: var(--r-md);
+}
+.bubble-role {
+  align-self: flex-start;
+  background: var(--bubble-role-bg);
+  color: var(--bubble-role-fg);
+  border-radius: var(--bubble-role-radius);
+}
+.bubble-user {
+  align-self: flex-end;
+  background: var(--bubble-user-bg);
+  color: var(--bubble-user-fg);
+  border-radius: var(--bubble-user-radius);
+}
+
+/* 打字机光标：只在流式进行中显示 */
+.caret::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: currentColor;
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── §5.6 / 减弱动效 ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .caret::after { animation: none; opacity: 0.6; }
+}
+
+/* 纸张纹理在低端设备关掉（GPU 合成开销） */
+.texture::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--texture-paper-opacity);
+  background-image: var(--texture-grain-url, none);
+  background-size: 180px 180px;
+}
+html.low-powered .texture::before { display: none; }
+
+/* ── 工具类 ─────────────────────────────────────────── */
+.row { display: flex; align-items: center; gap: var(--sp-3); }
+.col { display: flex; flex-direction: column; }
+.grow { flex: 1 1 auto; min-width: 0; }
+.muted { color: var(--text-tertiary); }
+.hidden { display: none !important; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}

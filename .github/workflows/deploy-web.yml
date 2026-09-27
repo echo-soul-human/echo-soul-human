@@ -1,0 +1,80 @@
+name: Deploy Web
+
+# 构建并发 GitHub Pages。
+# base 由 GITHUB_REPOSITORY 自动推导：profile 仓库走根路径，普通仓库走 /<repo>/。
+# 这一步不能省 —— 写死 base 会在换仓库形态时整站 404，且症状是白屏无报错。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'shared/**'
+      - 'supabase/functions/_shared/prefix/**'
+      - 'manifest.json'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+      - name: Regenerate artifacts (base 在此步按仓库形态推导)
+        run: npm run gen:prefix && npm run gen:tokens && npm run gen:manifest
+
+      # 前端可暴露的只有公开键，靠 RLS 兜底；绝不能注入 service_role / 模型 Key
+      - name: Build web
+        working-directory: web
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Bundle budget
+        working-directory: web
+        run: node ../scripts/check-bundle.mjs
+
+      # 构建产物里不得出现任何服务级凭据
+      - name: Assert no secrets in dist
+        working-directory: web
+        run: |
+          if grep -RIlE 'service_role|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6[^"]*\.[A-Za-z0-9_-]*[A-Za-z0-9_-]{20,}' dist \
+             | grep -v 'anon' ; then
+            echo '::error::dist 中发现疑似服务级凭据，终止发布'
+            exit 1
+          fi
+          echo 'dist 无服务级凭据'
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

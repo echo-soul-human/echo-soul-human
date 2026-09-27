@@ -1,0 +1,105 @@
+name: CI
+
+# 每次 push / PR 都跑四道防线 + 单测。
+# 这四道防线都是做过反向测试的，任何一条红了就挡住合并 ——
+# 它们各自对应一次真实事故或一个会静默亏钱的坑，见 docs/迁移与验收记录.md 第四节。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24          # tests/run.mjs 直连 .ts，需 Node ≥23
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install root deps
+        run: npm ci --no-audit --no-fund
+
+      # ── 防线 1：密钥泄漏 ────────────────────────────────
+      # 扫被跟踪文件。命中即失败，且提示必须轮换（进过 git 历史就等于已泄漏）
+      - name: Guard · secret scan
+        run: node scripts/secret-scan.mjs
+
+      # ── 防线 2：SQL 静态检查 ────────────────────────────
+      # 防的是尚贤圈那次 $$ 被 JS 字符串替换转义、导致函数静默损坏的事故
+      - name: Guard · SQL
+        run: node scripts/check-sql.mjs --verbose
+
+      # ── 生成物必须与源一致（防止有人改生成物而不是改源）──
+      - name: Regenerate artifacts
+        run: |
+          npm run gen:prefix
+          npm run gen:tokens
+          npm run gen:manifest
+
+      # ── 防线 3：静态前缀未被污染 ────────────────────────
+      # 前缀混进动态值 = 击穿提示词缓存 = 单轮成本涨 3.2 倍且不报错
+      - name: Guard · prompt prefix
+        run: node scripts/check-prefix.mjs
+
+      # ── 防线 4：SW 不得引入缓存层 ───────────────────────
+      - name: Guard · service worker
+        run: node scripts/audit-sw.mjs
+
+      # ── 生成物一致性 ────────────────────────────────────
+      # 生成物已入库（前缀 hash 是成本防线的一部分），
+      # 所以源改了没重跑生成器会在这里被抓到
+      - name: Assert generated files are up to date
+        run: |
+          if ! git diff --exit-code --stat -- \
+              supabase/functions/_shared/prefix.generated.ts \
+              web/src/styles/tokens.generated.css \
+              web/src/app/tokens.generated.ts \
+              web/public/manifest.webmanifest \
+              web/public/version.json \
+              android/version.properties \
+              android/app/src/main/java/com/echosoul/app/ui/design/DesignTokens.kt
+          then
+            echo '::error::生成物与源不一致 —— 请本地跑 npm run gen:prefix && npm run gen:tokens && npm run gen:manifest 并提交'
+            exit 1
+          fi
+
+      - name: Unit tests
+        run: npm test
+
+  web-build:
+    needs: guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install web deps
+        working-directory: web
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        working-directory: web
+        run: npm run typecheck
+      - name: Build
+        working-directory: web
+        run: npm run build
+      # 首屏 JS 预算 180KB gzip（docs/分册-网页端.md §10）。
+      # 超预算按 bug 处理，不是"以后优化"
+      - name: Assert bundle budget
+        working-directory: web
+        run: node ../scripts/check-bundle.mjs
