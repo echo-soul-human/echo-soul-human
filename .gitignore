@@ -1,0 +1,45 @@
+# ─── 依赖与构建产物 ───
+node_modules/
+dist/
+build/
+unpackage/
+*.tsbuildinfo
+.vite/
+web/src/types/generated/
+
+# ─── 安卓 ───
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/.idea/
+*.apk
+*.aab
+
+# ─── ★ 密钥：一律不入库（v1 事故防线，见 docs/分册-安卓端.md §0）───
+*.keystore
+*.jks
+keystore/
+*.token
+*-key.txt
+*-keys.txt
+*_secret*
+.env
+.env.*
+!.env.example
+supabase/.temp/
+
+# ─── 本地记忆与临时 ───
+.workbuddy/
+.tmp-site/
+*.log
+.DS_Store
+Thumbs.db
+
+# ─── 大文件 ───
+*.mp4
+*.mov
+*.psd
+
+# ⚠️ 以下文件即使被显式 git add 也必须拒绝（scripts/secret-scan.mjs 在 CI 兜底）
+# supabase-service-role-key.txt / *-gh-token.txt / jpush-keys.txt / *-pat.txt

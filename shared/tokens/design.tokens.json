@@ -1,0 +1,94 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "_note": "跨端设计 token 单一源。网页由 scripts/gen-tokens.mjs 生成 CSS 变量，安卓生成 Colors/Dimens/Typography.kt。皮肤 = 对本文件 tier1/tier2 的覆盖，组件只允许消费 tier3。禁止在任何端手写色值。",
+
+  "tier1": {
+    "_brand_note": "品牌色：浅蓝 + 心跳粉（微淡）。浅蓝单独用会读成冷调科技蓝，因此底色取暖白，让蓝与粉坐在暖地上。角色侧=蓝（他者/星），用户侧=粉（自己/心）。",
+    "color": {
+      "paper":        "#FBF8F6",
+      "paper-warm":   "#F4EDE8",
+      "paper-deep":   "#E9DFD8",
+
+      "blue":         "#7FB6D9",
+      "blue-deep":    "#4E88AE",
+      "blue-press":   "#3E6F92",
+      "blue-tint":    "#E8F1F8",
+      "blue-ink":     "#22333D",
+
+      "pink":         "#F2A9B8",
+      "pink-deep":    "#E0829A",
+      "pink-tint":    "#FADDE3",
+      "pink-ink":     "#4A2C33",
+
+      "ink":          "#2B2622",
+      "ink-soft":     "#5C5347",
+      "ink-faint":    "#8C8172",
+      "hairline":     "#E3D8D0",
+      "hairline-strong": "#C4B3A8",
+      "accent":       "#4E88AE",
+      "accent-deep":  "#3E6F92",
+      "danger":       "#A8321E",
+      "warn":         "#C9862B",
+      "ok":           "#4A7A56"
+    },
+    "font": {
+      "display": "LXGWWenKai, 'Source Han Serif SC', 'Songti SC', serif",
+      "body":    "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', system-ui, sans-serif",
+      "mono":    "'JetBrains Mono', ui-monospace, monospace"
+    },
+    "radius": { "sm": "4px", "md": "10px", "lg": "16px" },
+    "space": { "0":"0","1":"2px","2":"4px","3":"8px","4":"12px","5":"16px","6":"20px","7":"24px","8":"32px","9":"40px","10":"48px","12":"64px","16":"96px" },
+    "duration": { "fast": "120ms", "base": "220ms", "slow": "400ms" },
+    "easing": {
+      "out-soft":  "cubic-bezier(.22,.61,.36,1)",
+      "in-out-soft":"cubic-bezier(.65,.05,.36,1)",
+      "spring":    "cubic-bezier(.34,1.56,.64,1)"
+    }
+  },
+
+  "tier2": {
+    "surface":        "{tier1.color.paper}",
+    "surface-raised": "{tier1.color.paper-warm}",
+    "surface-sunken": "{tier1.color.paper-deep}",
+    "text-primary":   "{tier1.color.ink}",
+    "text-secondary": "{tier1.color.ink-soft}",
+    "text-tertiary":  "{tier1.color.ink-faint}",
+    "text-inverse":   "{tier1.color.paper}",
+    "border":         "{tier1.color.hairline}",
+    "border-strong":  "{tier1.color.hairline-strong}",
+    "brand":          "{tier1.color.blue-deep}",
+    "brand-deep":     "{tier1.color.blue-press}",
+    "heart":          "{tier1.color.pink}",
+    "heart-deep":     "{tier1.color.pink-deep}",
+
+    "font-role":      "{tier1.font.display}",
+    "font-user":      "{tier1.font.body}",
+
+    "_a11y_note": "text-primary #2B2622 on #FBF8F6 ≈ 13.4:1；blue-ink #22333D on blue-tint #E8F1F8 ≈ 11.2:1；pink-ink #4A2C33 on pink-tint #FADDE3 ≈ 9.8:1；text-inverse #FBF8F6 on blue-press #3E6F92 ≈ 5.1:1（可作按钮前景）。text-tertiary ≈ 4.1:1，仅用于非必读装饰文字。皮肤上架前由 scripts/check-skin-contrast.mjs 强制 ≥ 4.5:1。"
+  },
+
+  "tier3": {
+    "bubble-user-bg":        "{tier1.color.pink-tint}",
+    "bubble-user-fg":        "{tier1.color.pink-ink}",
+    "bubble-user-radius":    "12px 12px 2px 12px",
+    "bubble-role-bg":        "{tier1.color.blue-tint}",
+    "bubble-role-fg":        "{tier1.color.blue-ink}",
+    "bubble-role-radius":    "12px 12px 12px 2px",
+    "composer-bg":           "{tier1.color.paper}",
+    "composer-border":       "{tier1.color.hairline-strong}",
+    "nav-bg":                "{tier1.color.paper-warm}",
+    "button-primary-bg":     "{tier1.color.blue-press}",
+    "button-primary-fg":     "{tier1.color.paper}",
+    "quote-font":            "{tier1.font.display}",
+    "quote-letter-spacing":  "0.01em",
+    "texture-paper-opacity": "0.35",
+    "elev-raise":  "0 1px 2px rgba(43,38,34,.06), 0 2px 8px rgba(43,38,34,.05)",
+    "elev-float":  "0 4px 16px rgba(43,38,34,.10), 0 12px 32px rgba(43,38,34,.08)",
+
+    "_forbidden": [
+      "紫蓝渐变", "玻璃模糊背景", "发光描边", "emoji 当图标",
+      "高饱和科技蓝主色（只用 #7FB6D9 / #4E88AE / #3E6F92 三档）",
+      "正文居中对齐", "角色与用户气泡同色（必须蓝/粉分侧）"
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "echosoul",
+  "version": "0.1.0",
+  "private": true,
+  "description": "星回 EchoSoul — AI 情感陪伴聊天产品（BYOK + 内置模型双轨）。网页 Vite+React18+TS，安卓 Kotlin+Compose 原生，后端 Supabase。与尚贤圈完全独立。",
+  "type": "module",
+  "scripts": {
+    "gen:manifest": "node scripts/gen-manifest.mjs",
+    "gen:prefix": "node scripts/gen-prefix-module.mjs",
+    "check:sql": "node scripts/check-sql.mjs",
+    "check:prefix": "node scripts/check-prefix.mjs",
+    "check:prefix:update": "node scripts/check-prefix.mjs --update",
+    "check:sw": "node scripts/audit-sw.mjs",
+    "check:secrets": "node scripts/secret-scan.mjs",
+    "test": "node tests/run.mjs",
+    "legal:platformize": "node scripts/legal-platformize.mjs",
+    "check": "npm run check:secrets && npm run check:sql && npm run gen:prefix && npm run check:prefix && npm run check:sw && npm run test",
+    "hooks:install": "node scripts/install-hooks.mjs",
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
+    "android:open": "start android",
+    "verify:db": "node scripts/verify-db.mjs",
+    "migrate": "node --env-file=.env scripts/migrate.mjs"
+  },
+  "engines": {
+    "node": ">=23",
+    "_why": "tests/run.mjs 直接 import .ts 源码，依赖 Node 的类型剥离（22.6 起需 --experimental-strip-types，23 起默认开启）"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "pg": "^8.13.1"
+  }
+}

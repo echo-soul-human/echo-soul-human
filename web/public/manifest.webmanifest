@@ -1,0 +1,50 @@
+{
+  "name": "星回",
+  "short_name": "星回",
+  "id": "/echosoul/",
+  "start_url": "/echosoul/?src=homescreen",
+  "scope": "/echosoul/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "portrait",
+  "background_color": "#F7F3EC",
+  "theme_color": "#F7F3EC",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "继续上次对话",
+      "url": "/echosoul/?s=resume"
+    },
+    {
+      "name": "新建角色",
+      "url": "/echosoul/?a=new"
+    }
+  ]
+}

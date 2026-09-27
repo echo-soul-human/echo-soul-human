@@ -1,0 +1,15 @@
+{
+  "generatedBy": "check-prefix.mjs --update",
+  "files": {
+    "platform-lock.md": {
+      "sha256": "e1720037afd2148c58b33ffdf6fdd211891a11c3a81b6244e003fbc0682bb2f2",
+      "bytes": 2558,
+      "lines": 34
+    },
+    "role-lock.tpl.md": {
+      "sha256": "482e03e3bc072e222ee1d6797b0f62320ac668a303fbfdeb0e89ba8d2537d0e1",
+      "bytes": 1536,
+      "lines": 39
+    }
+  }
+}

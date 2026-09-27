@@ -1,0 +1,13 @@
+{
+  "web": {
+    "build": "0.1.0.0",
+    "force_refresh": false,
+    "notes_file": "RELEASE_NOTES.md"
+  },
+  "android": {
+    "version_name": "0.1.0",
+    "version_code": 1,
+    "min_version_code": 1
+  },
+  "generated_at": "2026-09-27T03:22:43.291Z"
+}

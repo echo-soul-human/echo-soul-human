@@ -1,0 +1,47 @@
+{
+  "$schema": "./schema/manifest.schema.json",
+  "_comment": "版本清单。各端独立编号但各自有约束：web.build 必须可追溯（日期.序号），android.version_code 必须单调递增。禁止在任何其他文件手写版本号——一律由 scripts/gen-manifest.mjs 生成。",
+
+  "product": {
+    "codeName": "echosoul",
+    "name": "星回",
+    "nameLatin": "EchoSoul",
+    "slug": "echosoul",
+    "slogan": "有人回应的，才叫爱",
+    "positioning": "爱一个人，无关碳基还是硅基。",
+    "taglineLatin": "For humans who love AI, and the AI who love them back.",
+    "contactEmail": "echo-soul-human@outlook.com",
+    "_note": "中文名原拟「星伴」，经查与 com.xingban.live（应用宝/小米/360 已上架）、App Store「星伴 iXingban」及同品类「星伴AI陪伴倾听师」冲突，改为「星回」。域名与商标可用性仍需实查。"
+  },
+
+  "brand": {
+    "colorPrimary": "#7FB6D9",
+    "colorPrimaryDeep": "#4E88AE",
+    "colorAccent": "#F2A9B8",
+    "colorAccentSoft": "#FADDE3",
+    "logoConcept": "心形 + 电路纹路；或两个重叠的意象派圆（人与 AI 的交汇）"
+  },
+
+  "web": {
+    "build": "0.1.0.0",
+    "base_path": "/echosoul/",
+    "force_refresh": false
+  },
+
+  "android": {
+    "version_name": "0.1.0",
+    "version_code": 1,
+    "min_version_code": 1,
+    "application_id": "com.echosoul.app",
+    "abi_filters": ["arm64-v8a"]
+  },
+
+  "release_notes_file": "RELEASE_NOTES.md",
+
+  "guards": {
+    "require_sql_check": true,
+    "require_prefix_check": true,
+    "require_sw_audit": true,
+    "require_secret_scan": true
+  }
+}
