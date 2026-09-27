@@ -8,6 +8,9 @@
  *   由 scripts/spa-404.mjs 在构建后生成。不要改成 hash 路由 —— URL 会变丑，
  *   而且分享链接的归因参数会一起变脏。
  */
+// 必须最先导入：它是副作用，要在 createRouter 之前把 404.html 带回来的
+// hash 路由标记还原成真实 history 状态，否则刷新后永远停在首页。
+import '../lib/restoreHashRoute';
 import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router';
 import Shell from './App';
 import { StartView } from '../features/character/StartView';

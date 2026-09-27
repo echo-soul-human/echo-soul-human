@@ -1,9 +1,9 @@
 {
   "name": "星回",
   "short_name": "星回",
-  "id": "/echosoul/",
-  "start_url": "/echosoul/?src=homescreen",
-  "scope": "/echosoul/",
+  "id": "/echo-soul-human/",
+  "start_url": "/echo-soul-human/?src=homescreen",
+  "scope": "/echo-soul-human/",
   "display": "standalone",
   "display_override": [
     "standalone",
@@ -40,11 +40,11 @@
   "shortcuts": [
     {
       "name": "继续上次对话",
-      "url": "/echosoul/?s=resume"
+      "url": "/echo-soul-human/?s=resume"
     },
     {
       "name": "新建角色",
-      "url": "/echosoul/?a=new"
+      "url": "/echo-soul-human/?a=new"
     }
   ]
 }

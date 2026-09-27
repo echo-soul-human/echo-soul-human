@@ -141,16 +141,18 @@ const { normalizeBase, baseFromRepository, resolveBase } = await import(
 t('normalizeBase 补前导与尾斜杠', () => eq(normalizeBase('echosoul'), '/echosoul/'));
 t('normalizeBase 空值归一为根路径', () => eq(normalizeBase(''), '/'));
 t('normalizeBase 保留已有尾斜杠', () => eq(normalizeBase('/a/b/'), '/a/b/'));
-t('profile 仓库（repo 名等于 owner）推导为根路径', () =>
-  eq(baseFromRepository({ GITHUB_REPOSITORY: 'echo-soul-human/echo-soul-human' }), '/'));
-t('profile 仓库判定大小写不敏感', () =>
-  eq(baseFromRepository({ GITHUB_REPOSITORY: 'FooBar/foobar' }), '/'));
+t('仓库名等于 owner 也走 /<repo>/（实测 Pages 是项目页，不是用户页）', () =>
+  eq(baseFromRepository({ GITHUB_REPOSITORY: 'echo-soul-human/echo-soul-human' }), '/echo-soul-human/'));
+t('大小写按仓库名原样保留', () =>
+  eq(baseFromRepository({ GITHUB_REPOSITORY: 'o/Repo' }), '/Repo/'));
 t('普通仓库推导为 /<repo>/', () =>
   eq(baseFromRepository({ GITHUB_REPOSITORY: 'echo-soul-human/echosoul' }), '/echosoul/'));
 t('无 GITHUB_REPOSITORY 返回 null 交回上层', () =>
   eq(baseFromRepository({}), null));
 t('ECHOSOUL_BASE 显式覆盖优先级最高', () =>
   eq(resolveBase({ env: { ECHOSOUL_BASE: '/x', GITHUB_REPOSITORY: 'a/a' } }).base, '/x/'));
+t('ECHOSOUL_BASE=/ 可显式声明用户站根路径', () =>
+  eq(resolveBase({ env: { ECHOSOUL_BASE: '/', GITHUB_REPOSITORY: 'a/a' } }).base, '/'));
 t('推导命中时来源标记为 GITHUB_REPOSITORY', () =>
   eq(resolveBase({ env: { GITHUB_REPOSITORY: 'o/r' } }).source, 'GITHUB_REPOSITORY'));
 

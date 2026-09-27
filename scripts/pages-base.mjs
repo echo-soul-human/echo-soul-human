@@ -22,11 +22,20 @@ export function normalizeBase(p) {
 export function baseFromRepository(env = process.env) {
   const repo = env.GITHUB_REPOSITORY;
   if (!repo || !repo.includes('/')) return null;
-  const [owner, name] = repo.split('/');
-  // user-site 仓库：仓库名 === owner（大小写不敏感）→ 根路径
-  if (name.toLowerCase() === owner.toLowerCase()) return '/';
+  const [, name] = repo.split('/');
   return normalizeBase('/' + name);
 }
+
+/**
+ * ⚠ 这里**不**再假设"仓库名等于 owner 就走根路径"。
+ * 那个假设被实测证伪了：echo-soul-human/echo-soul-human 这个仓库，
+ * GitHub Pages API 返回的是 https://echo-soul-human.github.io/echo-soul-human/
+ * —— 项目页，不是用户页。猜错的表现是整站白屏且没有任何报错，很难查。
+ *
+ * 所以：默认一律 /<repo>/；确实是用户站仓库时显式设 ECHOSOUL_BASE=/ 。
+ * 核实真实路径的权威方法：
+ *   GET /repos/{owner}/{repo}/pages  →  看 html_url
+ */
 
 export function resolveBase({ env = process.env, manifestPath, cwd = process.cwd() } = {}) {
   if (env.ECHOSOUL_BASE) {
