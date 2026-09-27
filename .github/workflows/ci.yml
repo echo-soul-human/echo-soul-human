@@ -76,6 +76,11 @@ jobs:
             exit 1
           fi
 
+      # 生成物必须「同样的源 → 同样的字节」。上一轮 CI 就是被
+      # gen-manifest 里的 generated_at: new Date() 卡死的 —— 检查没错，是生成不确定。
+      - name: Guard · deterministic artifacts
+        run: node scripts/check-deterministic.mjs
+
       - name: Unit tests
         run: npm test
 

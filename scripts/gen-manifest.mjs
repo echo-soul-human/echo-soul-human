@@ -65,6 +65,12 @@ const webmanifest = {
   ],
 };
 
+/**
+ * 生成物必须**确定性**：同样的源每次生成出完全相同的字节。
+ * 之前这里写了 generated_at: new Date()，导致 CI 的"生成物是否最新"
+ * 检查永远比出 diff 而必然失败 —— 那道检查本身是对的，是我生成的东西不确定。
+ * 需要时间戳请由运行时的 /version Edge Function 自己加。
+ */
 const versionJson = {
   web: { build: web.build, force_refresh: web.force_refresh, notes_file: src.release_notes_file },
   android: {
@@ -72,7 +78,6 @@ const versionJson = {
     version_code: android.version_code,
     min_version_code: android.min_version_code,
   },
-  generated_at: new Date().toISOString(),
 };
 
 const writes = [

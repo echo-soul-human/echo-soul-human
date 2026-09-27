@@ -12,9 +12,11 @@ export interface ResolveBaseOptions {
 
 export interface ResolvedBase {
   base: string;
-  source: 'ECHOSOUL_BASE' | 'GITHUB_REPOSITORY' | 'manifest.web.base_path' | 'default';
+  source: 'ECHOSOUL_BASE' | 'GITHUB_REPOSITORY' | 'git remote origin' | 'manifest.web.base_path' | 'default';
 }
 
 export function normalizeBase(p: string | undefined | null): string;
 export function baseFromRepository(env?: Record<string, string | undefined>): string | null;
+export function baseFromRemoteUrl(url: string | null | undefined): string | null;
+export function baseFromGitRemote(cwd?: string): string | null;
 export function resolveBase(options?: ResolveBaseOptions): ResolvedBase;
