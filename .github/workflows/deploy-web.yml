@@ -1,7 +1,8 @@
 name: Deploy Web
 
 # 构建并发 GitHub Pages。
-# base 由 GITHUB_REPOSITORY 自动推导：profile 仓库走根路径，普通仓库走 /<repo>/。
+# base 由仓库形态推导（ECHOSOUL_BASE > GITHUB_REPOSITORY > git remote > manifest），
+# 本地与 CI 走同一套推导，生成物才不会两边分叉。
 # 这一步不能省 —— 写死 base 会在换仓库形态时整站 404，且症状是白屏无报错。
 
 on:
@@ -70,6 +71,15 @@ jobs:
             exit 1
           fi
           echo 'dist 无服务级凭据'
+
+      # 缺 404.html 时，子路由刷新命中的是 GitHub 自带的 404 页 ——
+      # 用户丢会话且线上没有任何报错可查，必须在发布前拦下。
+      - name: Assert SPA fallback exists
+        working-directory: web
+        run: |
+          test -f dist/404.html || { echo '::error::dist/404.html 缺失（spa-404 插件未生效）'; exit 1; }
+          grep -q 'id="root"' dist/index.html
+          echo "404.html 就位：$(wc -c < dist/404.html) 字节"
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

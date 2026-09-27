@@ -1,15 +1,16 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin, type ResolvedConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { resolveBase } from '../scripts/pages-base.mjs';
+import { writeSpa404 } from '../scripts/spa-404.mjs';
 
 /**
  * base 与 PWA 的 id/scope/start_url 必须完全一致，否则资源 404、PWA 装不上。
- * 而且 profile 仓库（仓库名等于 owner）的 Pages 挂在**根路径**，
- * 所以这里不能照抄 manifest.web.base_path —— 必须和 gen-manifest.mjs
- * 共用同一个推导逻辑，两边算出来的值才不会分叉。
+ * 所以这里不能照抄 manifest.web.base_path —— 必须和 gen-manifest.mjs 共用
+ * 同一个推导（ECHOSOUL_BASE > GITHUB_REPOSITORY > git remote > manifest > 默认），
+ * 两边算出来的值才不会分叉；推导顺序也保证本地和 CI 得到同一个 base。
  */
 const here = dirname(fileURLToPath(import.meta.url));
 const rootManifest = JSON.parse(
@@ -17,9 +18,26 @@ const rootManifest = JSON.parse(
 );
 const { base: BASE } = resolveBase({ manifestPath: 'manifest.json', cwd: resolve(here, '..') });
 
+/**
+ * GitHub Pages 不做 rewrite：刷新子路由会命中 404.html。
+ * 这份回退页必须知道真实 base，所以只能在构建期生成，不能留成静态文件。
+ */
+let outDir: string = resolve(here, 'dist');
+
+const spa404: Plugin = {
+  name: 'echosoul:spa-404',
+  apply: 'build',
+  configResolved(cfg: ResolvedConfig) {
+    outDir = cfg.build.outDir;
+  },
+  closeBundle() {
+    writeSpa404(outDir, BASE);
+  },
+};
+
 export default defineConfig({
   base: BASE,
-  plugins: [react()],
+  plugins: [react(), spa404],
 
   // 构建号注入 <meta name="x-build">，运行时轮询 /version 比对后提示刷新
   define: {

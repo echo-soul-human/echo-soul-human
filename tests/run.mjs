@@ -135,8 +135,13 @@ t('malformed ipv4 treated as unsafe', () => truthy(isPrivateIp('999.1.1.1')));
 
 // ── Pages base 推导 ──────────────────────────────────────
 console.log('\n[pages base]');
-const { normalizeBase, baseFromRepository, resolveBase } = await import(
-  '../scripts/pages-base.mjs');
+const { normalizeBase, baseFromRepository, baseFromRemoteUrl, baseFromGitRemote, resolveBase } =
+  await import('../scripts/pages-base.mjs');
+const { mkdtempSync } = await import('node:fs');
+const { tmpdir } = await import('node:os');
+const { join } = await import('node:path');
+// 空目录且不在本仓库工作树内 → git 向上找不到 .git，用来断言"读不到 remote"这条回落路径
+const nonGitDir = mkdtempSync(join(tmpdir(), 'echosoul-nogit-'));
 
 t('normalizeBase 补前导与尾斜杠', () => eq(normalizeBase('echosoul'), '/echosoul/'));
 t('normalizeBase 空值归一为根路径', () => eq(normalizeBase(''), '/'));
@@ -155,6 +160,59 @@ t('ECHOSOUL_BASE=/ 可显式声明用户站根路径', () =>
   eq(resolveBase({ env: { ECHOSOUL_BASE: '/', GITHUB_REPOSITORY: 'a/a' } }).base, '/'));
 t('推导命中时来源标记为 GITHUB_REPOSITORY', () =>
   eq(resolveBase({ env: { GITHUB_REPOSITORY: 'o/r' } }).source, 'GITHUB_REPOSITORY'));
+
+t('ssh 形态 remote 解析为 /<repo>/', () =>
+  eq(baseFromRemoteUrl('git@github.com:echo-soul-human/echo-soul-human.git'), '/echo-soul-human/'));
+t('https 形态 remote 解析为 /<repo>/', () =>
+  eq(baseFromRemoteUrl('https://github.com/o/r.git'), '/r/'));
+t('非 github 的 remote 不接管，交回上层', () =>
+  eq(baseFromRemoteUrl('https://gitlab.example.com/o/r.git'), null));
+t('空 remote 安全返回 null', () => eq(baseFromRemoteUrl(''), null));
+t('非 git 目录读不到 remote', () => eq(baseFromGitRemote(nonGitDir), null));
+t('既无 CI 变量也无 remote 时回落 default', () =>
+  eq(resolveBase({ env: {}, cwd: nonGitDir }).source, 'default'));
+// 回归：本地没有 GITHUB_REPOSITORY，过去会回落到写死的 /echosoul/，
+// 而 CI 推出 /<repo>/ → 同一份源生成出两种 base，一致性检查必然失败。
+t('本地与 CI 同源：无 CI 变量时从 git remote 推出同一个 base', () => {
+  const viaRemote = baseFromGitRemote(process.cwd());
+  truthy(viaRemote, '本仓库应配置 github origin');
+  eq(resolveBase({ env: {}, cwd: process.cwd() }).base, viaRemote);
+});
+
+// ── SPA 回退页 404.html ──────────────────────────────────
+// 回退页脚本是纯字符串，用 new Function 喂一个假 window.location
+// 就能真断言跳转结果，不必开浏览器。
+console.log('\n[spa 404]');
+const { spa404Script, renderSpa404 } = await import('../scripts/spa-404.mjs');
+
+function spa404Jump(base, { pathname, search = '', hash = '' }) {
+  let jumped = null;
+  const win = { location: { pathname, search, hash, replace: (u) => { jumped = u; } } };
+  new Function('window', spa404Script(base))(win);
+  return jumped;
+}
+const r = (s) => encodeURIComponent(s);
+
+t('项目页 base：剥掉 base，保留子路由与 query', () =>
+  eq(spa404Jump('/echo-soul-human/', { pathname: '/echo-soul-human/chat/7', search: '?from=share:ab' }),
+    '/echo-soul-human/#r=' + r('/chat/7?from=share:ab')));
+t('根路径 base（ECHOSOUL_BASE=/）不得吃掉首段路由', () =>
+  eq(spa404Jump('/', { pathname: '/chat/7' }), '/#r=' + r('/chat/7')));
+t('停在 base 目录本身时回落首页', () =>
+  eq(spa404Jump('/echo-soul-human/', { pathname: '/echo-soul-human/' }),
+    '/echo-soul-human/#r=' + r('/')));
+t('pathname 不在 base 下也只回 base 首页，不拼出站外地址', () =>
+  eq(spa404Jump('/echo-soul-human/', { pathname: '/other/place' }),
+    '/echo-soul-human/#r=' + r('/')));
+t('原有 hash 一并带走', () =>
+  eq(spa404Jump('/b/', { pathname: '/b/chat/1', hash: '#frag' }), '/b/#r=' + r('/chat/1#frag')));
+t('回退页标记 noindex，不被搜索引擎收录', () =>
+  truthy(renderSpa404('/x/').includes('name="robots" content="noindex"')));
+t('base 含 < 时转义，不能提前闭合 <script>', () => {
+  const html = renderSpa404('/a<b>/');
+  truthy(!html.includes('var BASE = "/a<b>"'), '原始 < 泄漏进了脚本');
+  truthy(html.includes('\\u003c'));
+});
 
 // ───────────────────────────────────────────────────────
 console.log('\n' + '='.repeat(52));

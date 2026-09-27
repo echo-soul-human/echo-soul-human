@@ -22,6 +22,11 @@
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "skipLibCheck": true,
+    // 只做类型检查，产物一律由 Vite 生成。
+    // 一旦 emit 出 src/**/*.js 或 vite.config.js，Vite 会优先加载它们
+    // （解析模块和找配置文件时 .js 都排在 .ts 前），
+    // 表现为「改了 .ts 却没生效」，极难查。
+    "noEmit": true,
     "baseUrl": ".",
     "paths": {
       "@/*": [
