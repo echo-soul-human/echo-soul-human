@@ -9,6 +9,7 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import './styles/tokens.generated.css';
+import './styles/type.css';
 import './styles/base.css';
 import './styles/components.css';
 

@@ -22,7 +22,7 @@ body {
   background: var(--surface);
   color: var(--text-primary);
   font-family: var(--f-body);
-  font-size: 16px;            /* 低于 16px 时 iOS 聚焦输入框会自动放大且不缩回 */
+  font-size: var(--fs-input);            /* 低于 16px 时 iOS 聚焦输入框会自动放大且不缩回 */
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   /* iOS 中文渲染偏细，标题用 600 不用 700 */

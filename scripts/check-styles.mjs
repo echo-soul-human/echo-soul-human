@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * check-styles.mjs — 手写样式里禁止硬编码颜色（开发任务 0-15 的颜色部分）
+ * check-styles.mjs — 手写样式禁止硬编码颜色与 px 字号（开发任务 0-15）
  *
  * 为什么值得守：皮肤是按档位卖的商品（§4.4），而皮肤系统的全部实现方式就是
  * 换 `--c-*` 变量。任何一处写死 `#E3D8D0`，用户换了皮肤那一处就不跟着变 ——
@@ -9,8 +9,8 @@
  * 零依赖而不是引 stylelint：本仓库其余守卫（check-sql / check-prefix /
  * check-icons / audit-sw）都是手写 .mjs，引框架会让 CI 与本地行为分叉。
  *
- * 范围说明：0-15 还含"禁 px 字号"，那条现在全站 32/32 违规，
- * 属于一次性改造而非守卫，没做进这里 —— 别让守卫假装它已通过。
+ * 字号同样收进阶梯：一处改大要搜 33 处，而 --fs-input 低于 16px 会让 iOS
+ * 聚焦输入框时自动放大页面且不缩回 —— 那是有名字才守得住的约束。
  *
  * 用法：node scripts/check-styles.mjs
  */
@@ -21,14 +21,17 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'web', 'src');
 
-/** 允许出现字面色值的文件：token 层本身（生成物）与首帧内联样式 */
+/** 允许出现字面色值与 px 字号的文件：token 层本身 */
 const ALLOW = [
   /\.generated\./,                       // 设计 token 生成物，色值的唯一归宿
+  /styles[\\/]type\.css$/,               // 字号阶梯，px 值的唯一归宿
   /styles[\\/]tokens/,                   // 手写 token 兜底（若将来出现）
 ];
 
 const HEX = /#[0-9a-fA-F]{3,8}\b/g;
 const FUNC = /\b(?:rgba?|hsla?|hwb|lab|lch|color)\s*\(/g;
+/** font-size 只许引用 --fs-*：低于 16px 的输入框会让 iOS 聚焦时自动放大且不缩回 */
+const PX_FONT_SIZE = /font-size:\s*[\d.]+px/g;
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -50,10 +53,10 @@ for (const file of walk(SRC)) {
   lines.forEach((line, i) => {
     const t = line.trim();
     if (t.startsWith('//') || t.startsWith('/*') || t.startsWith('*')) return;   // 注释行不算
-    const hits = [...line.matchAll(HEX), ...line.matchAll(FUNC)];
+    const hits = [...line.matchAll(HEX), ...line.matchAll(FUNC), ...line.matchAll(PX_FONT_SIZE)];
     for (const h of hits) {
-      // TS 里的类型色值（如联合类型字面量）不会长得像 #rgb，无需特判
-      problems.push(`${rel}:${i + 1}  ${h[0]}  →  用 var(--c-*)  ${t.slice(0, 60)}`);
+      const isPx = h[0].startsWith('font-size');
+      problems.push(`${rel}:${i + 1}  ${h[0]}  →  ${isPx ? '用 var(--fs-*) 阶梯' : '用 var(--c-*)'}  ${t.slice(0, 60)}`);
     }
   });
 }
