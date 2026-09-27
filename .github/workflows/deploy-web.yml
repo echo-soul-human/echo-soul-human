@@ -57,6 +57,23 @@ jobs:
           npm ci --no-audit --no-fund
           npm run build
 
+      # 缺 VITE_SUPABASE_URL 时 Vite 构建照样成功，只是产物里没有 Supabase 地址，
+      # 要到运行时才炸 —— 上一版部署就是这么"全绿"上线了一个整站白屏。
+      - name: Assert runtime config baked in
+        working-directory: web
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          : "${VITE_SUPABASE_URL:?VITE_SUPABASE_URL 未配置：Settings → Secrets and variables → Actions}"
+          : "${VITE_SUPABASE_ANON_KEY:?VITE_SUPABASE_ANON_KEY 未配置}"
+          host="${VITE_SUPABASE_URL#*://}"
+          if ! grep -rq "$host" dist/assets/; then
+            echo "::error::产物里没有 ${host} —— 构建时环境变量没注入，发布出去就是白屏"
+            exit 1
+          fi
+          echo "运行期配置已注入：$host"
+
       - name: Bundle budget
         working-directory: web
         run: node ../scripts/check-bundle.mjs

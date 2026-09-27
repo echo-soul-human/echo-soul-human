@@ -16,6 +16,7 @@ import { router } from './app/router';
 import { RouterProvider } from '@tanstack/react-router';
 import { APP_BUILD, BASE_PATH } from './app/version';
 import { platform } from './lib/platform';
+import { supabaseConfigError } from './lib/supabase';
 
 // 构建号写进 meta，运行时轮询 /version 比对后提示刷新（docs/分册-网页端.md §6.3）
 document.head.insertAdjacentHTML(
@@ -38,13 +39,37 @@ const queryClient = new QueryClient({
 const container = document.getElementById('root');
 if (!container) throw new Error('#root missing');
 
-createRoot(container).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  </StrictMode>,
-);
+/**
+ * 配置缺失 ⇒ 不挂载，直接画一条可读的失败信息。
+ * 让模块抛错去炸白屏的话，线上症状是「页面全白、什么报错都看不见」，
+ * 而这条路是北极星指标（新用户首次对话完成率）的第一道门。
+ */
+if (supabaseConfigError) {
+  renderBootFailure(container, supabaseConfigError);
+} else {
+  createRoot(container).render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </StrictMode>,
+  );
+}
+
+function renderBootFailure(el: HTMLElement, message: string): void {
+  document.getElementById('boot')?.remove();
+  el.replaceChildren();
+  const box = document.createElement('div');
+  box.style.cssText = 'max-width:30rem;margin:18vh auto;padding:0 1.25rem;text-align:center';
+  const title = document.createElement('h1');
+  title.textContent = '星回暂时无法启动';
+  const reason = document.createElement('p');
+  reason.textContent = message;                       // textContent：不解析成 HTML
+  const hint = document.createElement('p');
+  hint.textContent = '这是部署配置问题，不是你的账号问题；处理后刷新即可。';
+  box.append(title, reason, hint);
+  el.append(box);
+}
 
 // 骨架屏：等首帧画出来再摘，避免闪白
 requestAnimationFrame(() => {
