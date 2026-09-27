@@ -126,7 +126,8 @@
 /* ── 建卡向导（底部抽屉）────────────────────────────── */
 .sheet {
   position: fixed; inset: 0; z-index: 40;
-  background: rgba(43, 38, 34, .38);
+  /* 从 --c-ink 派生，跟随皮肤。原先写死 rgba(43,38,34,.38) —— 那正是当前 ink 的抄件 */
+  background: color-mix(in srgb, var(--c-ink) 38%, transparent);
   display: flex; align-items: flex-end; justify-content: center;
 }
 .sheet-inner {
