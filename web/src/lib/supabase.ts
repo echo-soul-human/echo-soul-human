@@ -4,8 +4,13 @@
  * ★ 这里只允许出现**公开键**（anon / publishable）。
  *   service_role 与任何模型 Key 都不得进入前端包 —— deploy-web.yml 里
  *   有一道 dist 扫描专门拦这件事。数据隔离靠 RLS，不靠"不给接口"。
+ *
+ * ★ 演示模式（?demo=1）会整体替换成离线垫片，让界面在后端未接通时也能看。
+ *   替换点选在这里而不是给 rpc.ts 里每个函数加分支：那样要改二十处，
+ *   每加一个接口就漏一处。见 dev/demoClient.ts。
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { demoMode, createDemoClient } from '../dev/demoClient';
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -26,25 +31,34 @@ export const supabaseConfigError: string | null =
 // 守卫之后统一收窄成非空，避免每个使用点都要再判一次
 const BASE_URL: string = supabaseConfigError ? 'http://127.0.0.1' : url!;
 
+/** 是否处于离线演示模式 */
+export const IS_DEMO = demoMode();
+
+function realClient(): SupabaseClient {
+  return createClient(BASE_URL, anonKey!, {
+    auth: {
+      // 会话存 localStorage。注意 iOS 会在 7 天不活跃后清理站点存储，
+      // 因此不能把它当唯一真源 —— 数据本身在云端（E1 定案）。
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: 'echosoul.auth',
+    },
+    global: { headers: { 'x-client-info': 'echosoul-web' } },
+  });
+}
+
 /**
  * 未配置时仍然不静默：任何一次真实使用都立刻抛错。
  * 正常路径下 main.tsx 根本不会挂载，用不到它。
  */
-export const supabase: SupabaseClient = supabaseConfigError
-  ? new Proxy({} as SupabaseClient, {
-      get(): never { throw new Error(supabaseConfigError!); },
-    })
-  : createClient(BASE_URL, anonKey!, {
-      auth: {
-        // 会话存 localStorage。注意 iOS 会在 7 天不活跃后清理站点存储，
-        // 因此不能把它当唯一真源 —— 数据本身在云端（E1 定案）。
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        storageKey: 'echosoul.auth',
-      },
-      global: { headers: { 'x-client-info': 'echosoul-web' } },
-    });
+export const supabase: SupabaseClient = IS_DEMO
+  ? (createDemoClient() as SupabaseClient)
+  : supabaseConfigError
+    ? new Proxy({} as SupabaseClient, {
+        get(): never { throw new Error(supabaseConfigError!); },
+      })
+    : realClient();
 
 /** Edge Function 调用地址 */
 export function fnUrl(name: string): string {

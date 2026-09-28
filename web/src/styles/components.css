@@ -165,6 +165,129 @@
   border-bottom: 1px solid var(--border); text-align: center;
 }
 
+/* ── 应用外壳与导航 ──────────────────────────────────────
+   窄屏底部标签栏、宽屏左侧竖栏。同一套 NavItems，两种摆法。
+   视觉走纸感 + 蓝粉，不用任何默认组件库的观感。 */
+.app-shell.has-nav { padding-bottom: 0; }
+
+.app-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.app-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 侧栏：只在够宽时出现 */
+.app-nav-side { display: none; }
+
+.brand-mark {
+  font: 600 18px/1 var(--f-display);
+  letter-spacing: .22em;
+  color: var(--c-ink-soft);
+  padding: var(--sp-6) var(--sp-5) var(--sp-6);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-5);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: var(--fs-body);
+  border-left: 2px solid transparent;
+  transition: color var(--t-fast) var(--ease-out-soft),
+              background var(--t-fast) var(--ease-out-soft);
+}
+.nav-item:hover { color: var(--text-primary); background: var(--surface-raised); }
+.nav-item.is-active {
+  color: var(--brand);
+  border-left-color: var(--brand);
+  background: var(--c-blue-tint);
+}
+
+/* 底部标签栏：窄屏默认 */
+.app-nav-bottom {
+  flex: none;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  border-top: 1px solid var(--border);
+  background: var(--nav-bg);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.app-nav-bottom .nav-item {
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--sp-2) 0 var(--sp-2);
+  border-left: none;
+  border-top: 2px solid transparent;
+  font-size: var(--fs-micro);
+  justify-content: center;
+}
+.app-nav-bottom .nav-item.is-active {
+  border-top-color: var(--brand);
+  background: transparent;
+}
+
+/* 够宽时切成左侧竖栏 */
+@media (min-width: 900px) {
+  .app-nav-bottom { display: none; }
+  .app-nav-side {
+    display: flex;
+    flex-direction: column;
+    width: 196px;
+    flex: none;
+    border-right: 1px solid var(--border);
+    background: var(--nav-bg);
+    padding-bottom: var(--sp-6);
+  }
+  .app-nav-side .nav-item { border-radius: 0 var(--r-md) var(--r-md) 0; }
+}
+
+/* 演示模式提示条：必须显眼，否则会把示例数据当成真实数据 */
+.demo-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  font-size: var(--fs-micro);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--c-pink-tint);
+  color: var(--c-pink-ink);
+  border-bottom: 1px solid var(--border);
+}
+.demo-exit {
+  color: var(--c-pink-ink);
+  text-decoration: underline;
+}
+
+/* 页面级容器 */
+.page {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-6) var(--sp-5) var(--sp-8);
+  max-width: 62rem;
+  margin: 0 auto;
+  width: 100%;
+}
+.page-head { margin-bottom: var(--sp-5); }
+.page-head h1 { font-size: var(--fs-display); font-weight: 600; }
+.page-head p { font-size: var(--fs-body); margin-top: var(--sp-2); }
+.page-foot { font-size: var(--fs-body); margin-top: var(--sp-6); }
+.link { color: var(--brand); text-decoration: none; }
+.link:hover { text-decoration: underline; }
+
+.sessions-host { min-height: 20rem; }
+
 /* ── 桌面三栏（分册 §12）────────────────────────────── */
 @media (min-width: 1100px) {
   .message-list { padding-inline: max(var(--sp-4), calc((100% - 68ch) / 2)); }

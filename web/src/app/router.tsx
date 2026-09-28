@@ -24,6 +24,7 @@ import { LegalIndex } from '../features/legal/LegalIndex';
 import { LegalDoc } from '../features/legal/LegalDoc';
 import { Plaza } from '../features/community/Plaza';
 import { ShareFeed } from '../features/community/ShareFeed';
+import { SessionsPage } from '../features/session/SessionsPage';
 
 declare module '@tanstack/react-router' {
   interface Register { router: typeof router }
@@ -104,6 +105,12 @@ const feedRoute = createRoute({
   component: ShareFeed,
 });
 
+const sessionsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/sessions',
+  component: SessionsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   startRoute,
   chatRoute,
@@ -116,6 +123,7 @@ const routeTree = rootRoute.addChildren([
   legalDocRoute,
   plazaRoute,
   feedRoute,
+  sessionsRoute,
 ]);
 
 export const router = createRouter({

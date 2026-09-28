@@ -135,3 +135,14 @@ export const IconMore = (p: IconProps) => (
 export const IconSend = (p: IconProps) => (
   <Svg {...p}><path d="M12 20V5" /><path d="M6 11l6-6 6 6" /></Svg>
 );
+export const IconPlaza = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="4" y="4" width="7" height="7" rx="1.6" />
+    <rect x="13" y="4" width="7" height="7" rx="1.6" />
+    <rect x="4" y="13" width="7" height="7" rx="1.6" />
+    <rect x="13" y="13" width="7" height="7" rx="1.6" />
+  </Svg>
+);
+export const IconUser = (p: IconProps) => (
+  <Svg {...p}><circle cx="12" cy="8" r="3.4" /><path d="M5 20a7 7 0 0 1 14 0" /></Svg>
+);
