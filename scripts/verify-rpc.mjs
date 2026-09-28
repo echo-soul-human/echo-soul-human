@@ -24,8 +24,12 @@ const DB = {
 };
 if (!DB.password) { console.error('缺少 SUPABASE_DB_PASSWORD'); process.exit(2); }
 
-const admin = new pg.Client(DB);
-await admin.connect();
+// ★ 用共享连接池，不要每次 withRole 都新开一条 Client。
+//   一轮跑上百次 withRole，session pooler 的连接数会被打满，
+//   症状是脚本静默卡住（前面实测卡死过一次），而且报错信息毫无指向性。
+//   admin 也从池里取，保证全脚本只有这一个连接来源。
+const pool = new pg.Pool({ ...DB, max: 4, idleTimeoutMillis: 15000 });
+const admin = await pool.connect();
 
 let pass = 0;
 const fails = [];
@@ -47,9 +51,8 @@ function isTransient(e) {
 
 /** 以指定身份开一次连接并设置 JWT。'service' = 不切角色（跑被 revoke 的内部函数） */
 async function withRole(asUid, fn, attempt = 1) {
-  const c = new pg.Client(DB);
+  const c = await pool.connect();
   try {
-    await c.connect();
     await c.query('begin');
     if (asUid === 'anon') {
       await c.query("select set_config('role','anon',true)");
@@ -65,13 +68,13 @@ async function withRole(asUid, fn, attempt = 1) {
     await c.query('rollback').catch(() => {});
     // 只对连接抖动重试；带 5 位 SQLSTATE 的是真实业务/权限错误，重试会掩盖问题
     if (attempt < 3 && isTransient(e) && !/^[0-9A-Z]{5}$/.test(String(e.code || ''))) {
-      await c.end().catch(() => {});
+      c.release();
       await new Promise((r) => setTimeout(r, 400 * attempt));
       return withRole(asUid, fn, attempt + 1);
     }
     throw e;
   } finally {
-    await c.end().catch(() => {});
+    c.release();
   }
 }
 
@@ -82,6 +85,16 @@ async function tryRpc(fn, args, asUid) {
   try {
     const r = await withRole(asUid, (c) => c.query('select public.' + fn + '(' + ph(args.length) + ') as v', args));
     return { ok: true, v: r.rows[0].v };
+  } catch (e) { return { ok: false, err: e.message, code: e.code }; }
+}
+
+/** 直接读表（不是函数）。表与函数的调用形态不同，混用会报 does not exist */
+async function tryTable(name, asUid, where = '', params = []) {
+  try {
+    const v = await withRole(asUid, (c) => c.query(
+      'select coalesce(jsonb_agg(to_jsonb(t)), \'[]\'::jsonb) as v from public.' +
+      name + ' t ' + (where ? 'where ' + where : ''), params));
+    return { ok: true, v: v.rows[0].v };
   } catch (e) { return { ok: false, err: e.message, code: e.code }; }
 }
 
@@ -544,6 +557,108 @@ const costViewLocked = await withRole(U, (c) =>
   c.query('select count(*)::int n from public.admin_cost_daily')).then(() => false).catch(() => true);
 t('成本视图对普通用户不可读', costViewLocked === true);
 
+// ─── 合规能力（012）─────────────────────────────────────
+console.log('\n[使用时长与提醒]');
+// 心跳计时：只有距上次 ≤90 秒的间隔才算活跃。
+// 不这么设计的话，挂着页面去吃饭会被算成使用，然后弹出"你已使用 8 小时"。
+const hb0 = await tryRpc('usage_heartbeat', [SID], U);
+t('首次心跳不计入时长（没有上一次参照）',
+  hb0.ok && Number(hb0.v.today_seconds) === 0, j(hb0.v ?? hb0.err));
+
+const hb1 = await tryRpc('usage_heartbeat', [SID], U);
+t('90 秒内的心跳被计入活跃时长',
+  hb1.ok && Number(hb1.v.today_seconds) >= 1, j(hb1.v ?? hb1.err));
+const afterH1 = Number(hb1.v.today_seconds);
+
+// 把上次心跳挪到 10 分钟前：这一次心跳应当**只加 0 秒**，不能把 600 秒空档算进来。
+// ⚠ 不能用"再打一次心跳看总时长没变"来验 —— 这一次心跳本身会把 last_beat_at
+//   重置成 now，紧接着的下一次就会合法地计入，那样断言必然失败（已踩过）。
+await admin.query(
+  "update public.usage_daily set last_beat_at = now() - interval '10 minutes' where user_id=$1", [U]);
+const hb2 = await tryRpc('usage_heartbeat', [SID], U);
+const afterGap = Number(hb2.v.today_seconds);
+t('超过 90 秒的空档不计入（挂机不算使用）',
+  hb2.ok && afterGap - afterH1 <= 2,
+  `心跳前 ${afterH1}s → 空档后 ${afterGap}s（若把 600s 算进来会接近 600）`);
+
+// 成人 2 小时提醒：直接把累计时长顶到阈值再打一次心跳
+await admin.query(
+  "update public.usage_daily set active_seconds = 7200, notified = '{}'::jsonb where user_id=$1", [U]);
+const hbAdult = await tryRpc('usage_heartbeat', [SID], U);
+t('成人累计 2 小时触发提醒',
+  hbAdult.ok && j(hbAdult.v.fire).includes('adult_2h'), j(hbAdult.v ?? hbAdult.err));
+const hbAdult2 = await tryRpc('usage_heartbeat', [SID], U);
+t('同一天不重复触发同一条提醒',
+  hbAdult2.ok && !j(hbAdult2.v.fire).includes('adult_2h'), j(hbAdult2.v ?? hbAdult2.err));
+
+// 未成年人 40 分钟提醒 + 宵禁提示
+const hbM0 = await tryRpc('usage_heartbeat', [null], MINOR);
+await admin.query(
+  "update public.usage_daily set active_seconds = 2400, notified = '{}'::jsonb where user_id=$1", [MINOR]);
+const hbMinor = await tryRpc('usage_heartbeat', [null], MINOR);
+t('未成年人标记为 is_minor', hbMinor.ok && hbMinor.v.is_minor === true, j(hbMinor.v ?? hbMinor.err));
+t('未成年人累计 40 分钟触发提醒',
+  hbMinor.ok && j(hbMinor.v.fire).includes('minor_40min'), j(hbMinor.v ?? hbMinor.err));
+t('未成年人不会收到成人那条（阈值分流正确）',
+  hbMinor.ok && !j(hbMinor.v.fire).includes('adult_2h'), j(hbMinor.v.fire));
+void hbM0;
+
+const myUse = await tryRpcSet('my_usage', [7], U);
+t('my_usage 可读自己的时长', myUse.ok && Array.isArray(myUse.v) && myUse.v.length >= 1,
+  myUse.ok ? String(myUse.v.length) + ' 天' : myUse.err);
+const myUseOther = await tryRpcSet('my_usage', [7], V);
+t('看不到别人的时长', !myUseOther.ok || myUseOther.v.length === 0,
+  myUseOther.ok ? String(myUseOther.v.length) : myUseOther.err);
+
+console.log('\n[AI 标识与反诈页]');
+const lab = await tryRpc('label_asset', ['image', 'test-asset', 'deepseek-chat', null], U);
+t('label_asset 可调', lab.ok, lab.err);
+t('返回的元数据字段固定（导出端不许自行发挥）',
+  lab.ok && lab.v.meta.ai_generated === true && lab.v.meta.generator === 'echosoul'
+  && typeof lab.v.meta.asset_id === 'string' && lab.v.meta.label_version === 'v1',
+  j(lab.ok ? lab.v.meta : lab.err));
+const labBad = await tryRpc('label_asset', ['nonsense', null, '', null], U);
+t('非法 kind 被拒', labBad.ok && labBad.v.ok === false, j(labBad.v ?? labBad.err));
+
+const chans = await tryTable('official_channels', 'anon', 'enabled');
+t('官方渠道页匿名可读（反诈页必须在登录前就能看）',
+  chans.ok && Array.isArray(chans.v) && chans.v.length >= 4, chans.ok ? String(chans.v.length) : chans.err);
+const rules = await tryTable('never_do_rules', 'anon', 'enabled');
+t('11 条"我们绝不会做"匿名可读',
+  rules.ok && Array.isArray(rules.v) && rules.v.length === 11,
+  rules.ok ? String(rules.v.length) : rules.err);
+
+console.log('\n[监护人通道]');
+// 监护人可能没有账号，所以提交必须允许匿名
+const gReq = await tryRpc('submit_guardian_request',
+  ['erase_account', 'kid@example.invalid', '孩子是未成年人，希望注销其账号', 'parent@example.invalid'], 'anon');
+t('监护人请求允许匿名提交', gReq.ok && gReq.v.ok === true, j(gReq.v ?? gReq.err));
+t('返回可核对的受理号', gReq.ok && /^GR\d{8}/.test(String(gReq.v.request_no)), j(gReq.ok ? gReq.v.request_no : ''));
+t('明示 7 个工作日响应（快于一般请求的 15 天）',
+  gReq.ok && Number(gReq.v.response_within_days) === 7, j(gReq.ok ? gReq.v : ''));
+
+const gStat = await tryRpc('guardian_status', [gReq.v.request_no], 'anon');
+t('凭受理号可匿名查进度', gStat.ok && gStat.v.ok === true && gStat.v.status === 'received',
+  j(gStat.v ?? gStat.err));
+t('进度查询不回任何账号内容',
+  gStat.ok && !j(gStat.v).includes('kid@example.invalid'), j(gStat.v));
+
+const grBad = await tryRpc('submit_guardian_request', ['erase_account', '', '', ''], 'anon');
+t('缺说明或联系方式被拒', grBad.ok && grBad.v.ok === false, j(grBad.v ?? grBad.err));
+
+// 请求明细表任何人都不能直接读（含提交者自己）
+const grTable = await tryTable('guardian_requests', U, 'true limit 5');
+t('监护人明细表对登录用户不可直接读', grTable.ok === false,
+  grTable.ok ? `泄漏 ${grTable.v.length} 行` : '');
+
+console.log('\n[提示去重]');
+const nt1 = await tryRpc('claim_notice', ['adult_2h_tip', false], U);
+t('首次认领提示返回 true', nt1.ok && nt1.v === true, j(nt1.v ?? n1.err));
+const nt2 = await tryRpc('claim_notice', ['adult_2h_tip', false], U);
+t('不可重复的提示第二次返回 false', nt2.ok && nt2.v === false, j(nt2.v ?? n2.err));
+const nt3 = await tryRpc('claim_notice', ['adult_2h_tip', true], U);
+t('可重复提示不受影响', nt3.ok && nt3.v === true, j(nt3.v ?? n3.err));
+
 // ─── 清理 ──────────────────────────────────────────────
 if (!KEEP) {
   console.log('\n[清理]');
@@ -590,7 +705,8 @@ if (!KEEP) {
   console.log('\n[清理] --keep，保留测试数据');
 }
 
-await admin.end();
+admin.release();
+await pool.end();
 console.log('\n' + '='.repeat(54));
 if (fails.length) {
   console.log('✗ ' + fails.length + ' 项失败 / 共 ' + (pass + fails.length));
